@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "election-coalition-app",
+  "private_key_id": "da31f0cd009c99e2a04f1360b49bc8333af7a266",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCft9MsNU8DZZ2e\n8+nmhi/5FHz3JHfbs0BhlN0I5cq/nMDhbe4NqyB04PL3QMZ8sLJZqonoLoepBuas\nciJKxksczafujCyqsUdeBez6C+OvZudjclvfZ7C/1xJxce+kYujEmQo0zAkeGn9p\nI27i//zv8Yusmj5cd4DCBA1O3WfdiekjctASHKQSgZLu8HkNSAR+nck6DuckgKIz\nffwRhFxVhdSMivXMQ7kOu1YUbgwiVhNoLymqk4BAtl+UwO30VQkjGs6hoEw61jIm\nQt7SYqTDafQnzt22tmRQfB98hUHdNc4Rcg5sRZi5axW+E7NGU6oh6j6Nr1BOG56Y\nLF0hqskfAgMBAAECggEAESEb6sqE1i5twIBpqNQ3Yj/07w81iOspOnicBA+btlUk\nx93hrAxFsi319i03nGPZnOLnYMQCFKStf00g/w1T55uUKRyrewWsS8SC7TDykvs2\n/GQQFQj/3HM/18mKaVeaSItz8W74g1wAJ3x/W0/CXCbMU2SaJOdEIzVgCqyVg8gn\n6bGo/zcEhI5Z9bNTZj30Zb/w/p44VDhg0VAvq4Qqll9oBvCXddRdwIURJQRK5dzE\n/jH+NQftTAG1BjmHSJu7fT9PBF3pvncWRpL6PGCXe5isJMw77tCqNdXfhkYR8Laz\nR5XVukBJudYh4jbL5PZ0MQOLGVCf6DqAvz9L6hZhgQKBgQDSzu0nQp31MvVzEJl3\nqL6pwpcF309TJZ4q1cmJxW+bkHqt25Srsp4r5iqZXyJG6rnVTeUanEzmat4NTbnt\nz72EzOC/jHZ+say75Mo+OnpNt8uNOGdOybaFRiX2pzbcgk/G8O/kA4X7cIDtvwfO\nDlo70DAHM6AYkHlQk2YhFgukPwKBgQDB9RZHe42aB+uOa5yIK73HelUkGI+vS9sF\nydFzi9/jbI/b/RxS8pWEPTkwsqt3iPcrhDfI0hO4HeZ22Q9+In2th/mOvg5P6er1\nZ/XXhHPFAm9H+KRbXLij+DH6pPn8TxlDF4hC1U+B6j8HwxhMnjxCm42IvIfzENsp\nKxz/p8ojIQKBgGzFNhpWxhfZNkorm3PhTpda/v+ZrF1TgJvLeVSr2Z1j29jO/pPk\n8rXl6b7/FjmPLVmA+qBTW15cb7xfiXrKAJh/+cr717whQuYj87JODAMDvXRdUPiX\nHaUAf+AXgTgfyLf2Y2C77KrC7tM9CPLp9ub70Xw1x/pEuUO4+i5CKLmTAoGAaGNI\nAmD07RmmJZi1PnSMR3gHqs2tR2NEFfFw0QdPEE+1fWjUfbAh2HI6/YKr1kHZBYq7\nm1G1Wzp8dyqLtA9MJMEyByky+r+ivUGehse6pyWQTuP7UVCt71H9VDDGeoz3w6w+\nofm8OOeh1MOjqFjhhdfCbP1LDf7cdWPGz7G2kQECgYBtXCQCO7PUFj6dVDS9kGow\nS5GzlwTbhnBwJPIbKs4f/bTrRBiY8ar40q3fa2Gju/FGKllXON19GX1xoJ/Op/bB\nlAEJL8vTQdOom0GSEy60qyaM2k8cBZFY/bM3QvOcYwmBsrY8iroK69RBv7lajZt0\ncxbSqSq8R2F77J7AfxDEmw==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-jx1oj@election-coalition-app.iam.gserviceaccount.com",
+  "client_id": "112912059572945264009",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-jx1oj%40election-coalition-app.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

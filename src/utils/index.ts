@@ -1,6 +1,22 @@
 import { randomUUID } from 'crypto';
 import * as otpGenerator from 'otp-generator';
 import * as phoneNumberParser from 'libphonenumber-js';
+import * as bcrypt from 'bcrypt';
+
+//hash password
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10);
+}
+
+//verify password
+export async function verifyPassword(
+  password: string,
+  hash: string,
+): Promise<boolean> {
+  return bcrypt.compare(password, hash);
+}
+
+//generate id
 export function generateId() {
   return randomUUID().toString().split('-').join('');
 }

@@ -12,6 +12,8 @@ import { User, UserSchema } from 'src/schemas/user.schema.dto';
 import { UserModule } from 'src/user/user.module';
 import { ProxyHttpService } from 'src/providers/proxy-http.service';
 import { FirebaseService } from 'src/providers/firebase.service';
+import { GoogleAuthStrategy } from './google.auth.strategy';
+import { UserRepository } from 'src/repositories/user.repository';
 
 @Module({
   controllers: [AuthController],
@@ -22,6 +24,8 @@ import { FirebaseService } from 'src/providers/firebase.service';
     ProxyHttpService,
     NotificationsActor,
     FirebaseService,
+    GoogleAuthStrategy,
+    UserRepository,
   ],
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),

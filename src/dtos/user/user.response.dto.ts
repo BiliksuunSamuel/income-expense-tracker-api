@@ -4,34 +4,22 @@ import { BaseSchema } from 'src/schemas/base.schema.dto';
 
 export class UserResponse extends BaseSchema {
   @ApiProperty()
-  name: string;
+  firstName: string;
 
   @ApiProperty()
   phoneNumber: string;
 
   @ApiProperty()
-  membershipId: string;
+  lastName: string;
 
   @ApiProperty()
   email: string;
 
   @ApiProperty()
-  constituency: string;
+  isLoggedIn: boolean;
 
   @ApiProperty()
-  constituencyCode: string;
-
-  @ApiProperty()
-  region: string;
-
-  @ApiProperty()
-  authenticated: boolean;
-
-  @ApiProperty()
-  profileImage: string;
-
-  @ApiProperty()
-  role: UserRole;
+  picture: string;
 
   @ApiProperty()
   status: UserStatus;

@@ -1,21 +1,17 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { BaseSchema } from './base.schema.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole, UserStatus } from 'src/enums';
+import { UserStatus } from 'src/enums';
 
 @Schema()
 export class User extends BaseSchema {
   @Prop()
   @ApiProperty()
-  name: string;
+  firstName: string;
 
   @Prop()
   @ApiProperty()
-  phoneNumber: string;
-
-  @ApiProperty()
-  @Prop()
-  membershipId: string;
+  lastName: string;
 
   @Prop()
   @ApiProperty()
@@ -23,15 +19,7 @@ export class User extends BaseSchema {
 
   @Prop()
   @ApiProperty()
-  constituency: string;
-
-  @Prop()
-  @ApiProperty()
-  constituencyCode: string;
-
-  @Prop()
-  @ApiProperty()
-  region: string;
+  phoneNumber: string;
 
   @Prop()
   @ApiProperty()
@@ -39,19 +27,11 @@ export class User extends BaseSchema {
 
   @Prop()
   @ApiProperty()
-  otpPrefix: string;
-
-  @Prop()
-  @ApiProperty()
-  authenticated: boolean;
+  isLoggedIn: boolean;
 
   @ApiProperty()
   @Prop()
-  profileImage: string;
-
-  @Prop()
-  @ApiProperty()
-  role: UserRole;
+  picture: string;
 
   @Prop()
   @ApiProperty()
@@ -64,6 +44,17 @@ export class User extends BaseSchema {
   @Prop()
   @ApiProperty()
   fcmToken: string;
+
+  @Prop()
+  @ApiProperty()
+  googleAccessToken: string;
+
+  @Prop()
+  @ApiProperty()
+  isGoogleAuth: boolean;
+
+  @Prop()
+  password: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

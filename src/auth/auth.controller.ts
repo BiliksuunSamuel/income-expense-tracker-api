@@ -1,4 +1,13 @@
-import { Body, Controller, Patch, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
@@ -8,11 +17,19 @@ import { AuthUser } from 'src/extensions/auth.extensions';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { VerifyOtpRequest } from 'src/dtos/auth/verify.otp.request.dto';
 import { formatPhoneNumber } from 'src/utils';
+import { GoogleAuthGuard } from './google.guard';
+import { UserRegisterRequest } from 'src/dtos/auth/user.register.request.dto';
 
 @Controller('api/authentication')
 @ApiTags('Authentication')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  async register(@Body() req: UserRegisterRequest, @Res() response: Response) {
+    const res = await this.authService.registerUser(req);
+    response.status(res.code).send(res);
+  }
 
   @Patch('logout')
   @UseGuards(JwtAuthGuard)
@@ -52,6 +69,20 @@ export class AuthController {
     @Res() response: Response,
   ) {
     const res = await this.authService.verifyOtpCode(request, user);
+    response.status(res.code).send(res);
+  }
+
+  //
+  @UseGuards(GoogleAuthGuard)
+  @Get('google')
+  google(@Req() req) {
+    return req.user;
+  }
+
+  @UseGuards(GoogleAuthGuard)
+  @Get('google/callback')
+  async googleRedirect(@Req() req, @Res() response) {
+    const res = await this.authService.googleLogin(req);
     response.status(res.code).send(res);
   }
 }

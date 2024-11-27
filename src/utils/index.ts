@@ -35,7 +35,7 @@ export function formatPhoneNumber(
   };
 }
 
-export function generateOtp(length: number = 4) {
+export function generateOtp(length: number = 6) {
   return otpGenerator.generate(length, {
     digits: true,
     lowerCaseAlphabets: false,

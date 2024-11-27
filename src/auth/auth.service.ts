@@ -16,6 +16,7 @@ import {
   generateId,
   generateOtp,
   hashPassword,
+  verifyPassword,
 } from 'src/utils';
 import { toUserReponse } from 'src/extensions/user.entensions';
 import { LoginRequest } from 'src/dtos/auth/login.request.dto';
@@ -244,20 +245,37 @@ export class AuthService {
   //This method is called by the validateUser method
   async login(request: LoginRequest): Promise<ApiResponseDto<AuthResponse>> {
     try {
-      let user = await this.userRepository
-        .findOne({ phoneNumber: request.username })
-        .lean();
+      let user = await this.userRepo.getByEmailAsync(request.email);
       if (!user) {
         return {
-          message: 'Incorrect login phone number',
+          message: 'Incorrect email address or password',
           code: HttpStatus.UNAUTHORIZED,
         };
       }
+
+      if (user.isGoogleAuth) {
+        return {
+          message: 'Please login with your google account',
+          code: HttpStatus.UNAUTHORIZED,
+        };
+      }
+
+      var passwordMatch = await verifyPassword(request.password, user.password);
+      if (!passwordMatch) {
+        return {
+          message: 'Incorrect email address or password',
+          code: HttpStatus.UNAUTHORIZED,
+        };
+      }
+
       user.verificationCode = generateOtp();
       user.isLoggedIn = false;
       user.updatedAt = new Date();
       user.tokenId = generateId();
-      const res = false; // await this.userService.updateAsync(user);
+      user.updatedBy = user.email;
+      user.updatedAt = new Date();
+      const { _id, ...others } = user as any;
+      const res = await this.userRepo.updateAsync(user.email, { ...others });
 
       if (!res) {
         return {
@@ -267,7 +285,7 @@ export class AuthService {
       }
 
       dispatch(this.notificationActor.smsNotificationActor, {
-        to: user.phoneNumber,
+        to: user.email,
         message: accountVerificationMessage('', user.verificationCode),
       });
 

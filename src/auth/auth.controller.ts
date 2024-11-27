@@ -40,16 +40,6 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() req: LoginRequest, @Res() response: Response) {
-    const phoneNumberValidationResults = formatPhoneNumber(req.username);
-    if (!phoneNumberValidationResults.isValid) {
-      response.status(400).send({
-        message: 'Invalid phone number',
-        code: 400,
-      });
-      return;
-    }
-
-    req.username = phoneNumberValidationResults.validNumber;
     const res = await this.authService.login(req);
     response.status(res.code).send(res);
   }

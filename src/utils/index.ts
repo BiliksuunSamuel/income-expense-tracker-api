@@ -65,9 +65,6 @@ export function toPaginationInfo(object: any): {
   };
 }
 
-export function accountVerificationMessage(
-  prefix: string,
-  code: string,
-): string {
-  return `Acccount verification details have been requested for your account, please do not share this details with anyone. Prefix ${prefix} and Code is ${code}`;
+export function accountVerificationMessage(code: string): string {
+  return `Acccount verification details have been requested for your account, please do not share this details with anyone.Code is ${code}`;
 }

@@ -79,8 +79,8 @@ export class AuthService {
       }
 
       dispatch(this.notificationActor.smsNotificationActor, {
-        to: user.phoneNumber,
-        message: accountVerificationMessage('', user.verificationCode),
+        to: user.email,
+        message: accountVerificationMessage(user.verificationCode),
       });
 
       const payload: UserJwtDetails = {
@@ -210,11 +210,18 @@ export class AuthService {
       user.isLoggedIn = false;
       user.updatedAt = new Date();
       user.tokenId = generateId();
-      //await this.userService.updateAsync(user);
+      const { _id, ...others } = user as any;
+      var res = await this.userRepo.updateAsync(user.email, { ...others });
+      if (!res) {
+        return {
+          message: 'Sorry,an error occured',
+          code: HttpStatus.FAILED_DEPENDENCY,
+        };
+      }
 
       dispatch(this.notificationActor.smsNotificationActor, {
-        to: user.phoneNumber,
-        message: accountVerificationMessage('', user.verificationCode),
+        to: user.email,
+        message: accountVerificationMessage(user.verificationCode),
       });
 
       const payload: UserJwtDetails = {
@@ -286,7 +293,7 @@ export class AuthService {
 
       dispatch(this.notificationActor.smsNotificationActor, {
         to: user.email,
-        message: accountVerificationMessage('', user.verificationCode),
+        message: accountVerificationMessage(user.verificationCode),
       });
 
       const payload: UserJwtDetails = {

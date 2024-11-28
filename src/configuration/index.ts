@@ -12,4 +12,6 @@ export default () => ({
   apiKey: process.env.ApiKey,
   apiSecret: process.env.ApiSecret,
   cloudName: process.env.CloudName,
+  emailPassword: process.env.EmailPassword,
+  emailUsername: process.env.EmailUserName,
 });

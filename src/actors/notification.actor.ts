@@ -5,6 +5,7 @@ import { FcmNotificationRequest } from 'src/dtos/notification/fcm.notification.r
 import { ProxyHttpService } from 'src/providers/proxy-http.service';
 import { FirebaseService } from 'src/providers/firebase.service';
 import { SendSmsRequest } from 'src/common';
+import { MailService } from 'src/providers/mail.service';
 
 @Injectable()
 export class NotificationsActor extends BaseActor {
@@ -13,6 +14,7 @@ export class NotificationsActor extends BaseActor {
   constructor(
     private readonly proxyHttpService: ProxyHttpService,
     private readonly firebaseService: FirebaseService,
+    private readonly mailService: MailService,
   ) {
     super();
   }
@@ -44,7 +46,12 @@ export class NotificationsActor extends BaseActor {
     async (msg: SendSmsRequest, ctx) => {
       try {
         this.logger.debug('sending sms notification', msg, ctx.name);
-        await this.proxyHttpService.sendSms(msg);
+        await this.mailService.sendEmail({
+          to: msg.to,
+          text: msg.message,
+          html: '',
+          subject: 'Verification Code',
+        });
       } catch (error) {
         this.logger.error(
           'an error occurred while sending sms notification',

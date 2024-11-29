@@ -4,8 +4,5 @@ import { IsNotEmpty } from 'class-validator';
 export class VerifyOtpRequest {
   @ApiProperty()
   @IsNotEmpty()
-  prefix: string;
-  @ApiProperty()
-  @IsNotEmpty()
   code: string;
 }

@@ -55,6 +55,22 @@ export class User extends BaseSchema {
 
   @Prop()
   password: string;
+
+  @Prop()
+  @ApiProperty()
+  emailVerified: boolean;
+
+  @Prop()
+  @ApiProperty()
+  authenticated: boolean;
+
+  @Prop({ default: false })
+  @ApiProperty()
+  resetPassword: boolean;
+
+  @Prop()
+  @ApiProperty()
+  otpExpiryTime: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

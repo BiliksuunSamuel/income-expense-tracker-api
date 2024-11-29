@@ -14,4 +14,5 @@ export default () => ({
   cloudName: process.env.CloudName,
   emailPassword: process.env.EmailPassword,
   emailUsername: process.env.EmailUserName,
+  googleAuthUrl: process.env.GoogleAuthUrl,
 });

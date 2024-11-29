@@ -64,6 +64,8 @@ export class UserRepository {
               isLoggedIn: true,
               updatedBy: request.email,
               tokenId: generateId(),
+              emailVerified: request.emailVerified,
+              authenticated: true,
             },
           },
           { new: true },

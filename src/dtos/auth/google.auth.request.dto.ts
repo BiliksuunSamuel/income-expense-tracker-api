@@ -4,4 +4,5 @@ export class GoogleAuthRequestDto {
   readonly email: string;
   readonly picture: string;
   readonly accessToken: string;
+  readonly emailVerified: boolean;
 }

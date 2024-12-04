@@ -12,7 +12,7 @@ export class ImageService {
   //upload image
   async cloudinaryUpload(
     file: any,
-    folder: string = 'ElectionResultsPinkSheets',
+    folder: string = 'IncomeExpenseInvoices',
   ): Promise<FileInfo> {
     try {
       const res: any = await cloudinary.v2.uploader.upload(file, {

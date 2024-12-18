@@ -72,6 +72,10 @@ export class Transaction extends BaseSchema {
   @Prop({ default: null })
   @ApiProperty()
   invoiceFileType: string;
+
+  @Prop({ default: null })
+  @ApiProperty()
+  budgetId: string;
 }
 
 export const TransactionSchema = SchemaFactory.createForClass(Transaction);

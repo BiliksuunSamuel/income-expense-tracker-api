@@ -17,12 +17,28 @@ import { AuthUser } from 'src/extensions/auth.extensions';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { TransactionFilter } from 'src/dtos/transaction/transaction.filter.dto';
 import { Transaction } from 'src/schemas/transaction.schema.dto';
+import { GroupedTransactionDto } from 'src/dtos/transaction/grouped.transaction.dto';
 
 @Controller('api/transactions')
 @ApiTags('Transactions')
 @UseGuards(JwtAuthGuard)
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
+
+  //get grouped transactions
+  @Get('grouped')
+  @ApiResponse({ type: GroupedTransactionDto })
+  async getGroupedTransactions(
+    @Query() filter: TransactionFilter,
+    @Res() response: Response,
+    @AuthUser() user: UserJwtDetails,
+  ) {
+    const res = await this.transactionService.getGroupedTransactions(
+      filter,
+      user,
+    );
+    response.status(res.code).send(res);
+  }
 
   //get transaction revenue summary for income and expense by period
   @Get('summary')

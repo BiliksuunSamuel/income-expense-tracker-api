@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PagedResults } from 'src/common/paged.results.dto';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
+import { GroupedTransactionDto } from 'src/dtos/transaction/grouped.transaction.dto';
 import { TransactionFilter } from 'src/dtos/transaction/transaction.filter.dto';
 import { TransactionFilterPeriod } from 'src/enums';
 import { Transaction } from 'src/schemas/transaction.schema.dto';
@@ -15,10 +16,68 @@ export class TransactionRepository {
     private readonly transactionRepository: Model<Transaction>,
   ) {}
 
+  //get grouped transactions
+  async getGroupedTransactions(
+    filter: TransactionFilter,
+    user: UserJwtDetails,
+  ): Promise<GroupedTransactionDto> {
+    const query: any = {
+      userId: user.id,
+    };
+    if (filter.currency) {
+      query.currency = filter.currency;
+    }
+    if (filter.category) {
+      query.category = filter.category;
+    }
+    if (filter.type) {
+      query.type = filter.type;
+    }
+    if (filter.repeatTransaction != null) {
+      query.repeatTransaction = filter.repeatTransaction;
+    }
+    if (filter.query) {
+      query.$or = [
+        { category: { $regex: filter.query, $options: 'i' } },
+        { description: { $regex: filter.query, $options: 'i' } },
+      ];
+    }
+    if (filter.period) {
+      const { startDate, endDate } =
+        convertTransactionFilterPeriodToDateTimeRange(filter.period);
+      query.createdAt = {
+        $gte: startDate,
+        $lte: endDate,
+      };
+    }
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const todayTransactions = await this.transactionRepository
+      .find({
+        createdAt: {
+          $gte: today.setHours(0, 0, 0, 0),
+          $lte: today.setHours(23, 59, 59, 999),
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+    const yesterdayTransactions = await this.transactionRepository
+      .find({
+        createdAt: {
+          $gte: yesterday.setHours(0, 0, 0, 0),
+          $lte: yesterday.setHours(23, 59, 59, 999),
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+    return {
+      today: todayTransactions,
+      yesterday: yesterdayTransactions,
+    };
+  }
+
   //get transaction for chart data by period
-  //{"type":"income|expense",total:0}[]
-  //don't sum the amount, just return the total amount for each transaction
-  //don't group by type, just return the total amount for each transaction
   async getTransactionForChart(
     user: UserJwtDetails,
     period: string,
@@ -109,6 +168,9 @@ export class TransactionRepository {
     }
     if (filter.repeatTransaction != null) {
       query.repeatTransaction = filter.repeatTransaction;
+    }
+    if (filter.budgetId) {
+      query.budgetId = filter.budgetId;
     }
     if (filter.query) {
       query.$or = [

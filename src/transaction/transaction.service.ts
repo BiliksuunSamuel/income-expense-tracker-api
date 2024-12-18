@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { dispatch } from 'nact';
+import { BudgetActor } from 'src/actors/budget.actor';
 import { ApiResponseDto } from 'src/common/api.response.dto';
 import { PagedResults } from 'src/common/paged.results.dto';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
+import { GroupedTransactionDto } from 'src/dtos/transaction/grouped.transaction.dto';
 import { TransactionFilter } from 'src/dtos/transaction/transaction.filter.dto';
 import { TransactionRequest } from 'src/dtos/transaction/transaction.request.dto';
 import { CommonResponses } from 'src/helper/common.responses.helper';
@@ -16,7 +19,32 @@ export class TransactionService {
   constructor(
     private readonly transactionRepository: TransactionRepository,
     private readonly imageService: ImageService,
+    private readonly budgetActor: BudgetActor,
   ) {}
+
+  //get grouped transactions
+  async getGroupedTransactions(
+    filter: TransactionFilter,
+    user: UserJwtDetails,
+  ): Promise<ApiResponseDto<GroupedTransactionDto>> {
+    try {
+      const groupedTransactions =
+        await this.transactionRepository.getGroupedTransactions(filter, user);
+      return CommonResponses.OkResponse(
+        groupedTransactions,
+        'Grouped transactions retrieved successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        'an error occurred while getting grouped transactions\n',
+        user,
+        error,
+      );
+      return CommonResponses.InternalServerErrorResponse<GroupedTransactionDto>(
+        'An error occurred while getting grouped transactions',
+      );
+    }
+  }
 
   //get transaction for chart data by period
   async getTransactionForChart(
@@ -167,6 +195,10 @@ export class TransactionService {
       }
 
       await this.transactionRepository.createTransaction(transaction);
+
+      if (transaction.budgetId) {
+        dispatch(this.budgetActor.updateBudgetDetails, transaction);
+      }
 
       return CommonResponses.OkResponse(true, 'Transaction added successfully');
     } catch (error) {

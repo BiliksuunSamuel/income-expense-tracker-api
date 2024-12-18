@@ -42,7 +42,7 @@ export class CommonResponses {
   static NotFoundResponse<T>(message?: string): ApiResponseDto<T> {
     return {
       code: HttpStatus.NOT_FOUND,
-      message: message || 'Not found',
+      message: message || 'Resource Not found',
     };
   }
 

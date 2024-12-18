@@ -26,4 +26,14 @@ export class UserRegisterRequest {
   @IsNotEmpty()
   @ApiProperty()
   readonly lastName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @ApiProperty()
+  currency: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @ApiProperty()
+  currencyName: string;
 }

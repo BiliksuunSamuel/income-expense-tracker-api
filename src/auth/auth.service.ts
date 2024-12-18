@@ -27,6 +27,8 @@ import configuration from 'src/configuration';
 import { GoogleAuthUserRequestDto } from 'src/dtos/common/google.auth.user.request.dto';
 import { GoogleAuthUserInfo } from 'src/dtos/auth/google.auth.user.info.dto';
 import { ResetPasswordRequestDto } from 'src/dtos/auth/reset.password.request.dto';
+import { CommonResponses } from 'src/helper/common.responses.helper';
+import { CurrencyRequest } from 'src/dtos/user/currency.request.dto';
 
 @Injectable()
 export class AuthService {
@@ -38,6 +40,52 @@ export class AuthService {
     private readonly notificationActor: NotificationsActor,
     private readonly proxyHttpService: ProxyHttpService,
   ) {}
+
+  //update user currency
+  async updateUserCurrencyAsync(
+    userId: string,
+    request: CurrencyRequest,
+  ): Promise<ApiResponseDto<AuthResponse>> {
+    try {
+      const user = await this.userRepo.getByIdAsync(userId);
+      if (!user) {
+        return CommonResponses.NotFoundResponse<AuthResponse>();
+      }
+      user.currency = request.code;
+      user.currencyName = request.name;
+      user.updatedAt = new Date();
+      user.updatedBy = userId;
+      user.tokenId = generateId();
+      const res = await this.userRepo.updateAsync(user.email, user);
+      if (!res) {
+        return CommonResponses.InternalServerErrorResponse<AuthResponse>(
+          'An error occurred while updating user currency',
+        );
+      }
+      return CommonResponses.OkResponse<AuthResponse>(
+        {
+          user: toUserReponse(user),
+          token: await this.generateToken({
+            id: user.id,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            tokenId: user.tokenId,
+          }),
+        },
+        'User currency updated successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        'an error occurred while updating user currency\n',
+        userId,
+        request,
+        error,
+      );
+      return CommonResponses.InternalServerErrorResponse<AuthResponse>(
+        'An error occurred while updating user currency',
+      );
+    }
+  }
 
   //handle reset password
   async resetPassword(

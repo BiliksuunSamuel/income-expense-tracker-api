@@ -52,4 +52,7 @@ export class TransactionRequest {
 
   @ApiProperty({ default: null })
   invoice: any;
+
+  @ApiProperty({ default: null })
+  budgetId: string;
 }

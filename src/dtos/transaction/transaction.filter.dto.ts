@@ -17,4 +17,7 @@ export class TransactionFilter extends BaseFilter {
 
   @ApiProperty({ required: false, default: TransactionFilterPeriod.Today })
   period: TransactionFilterPeriod;
+
+  @ApiProperty({ required: false, default: null })
+  budgetId: string;
 }

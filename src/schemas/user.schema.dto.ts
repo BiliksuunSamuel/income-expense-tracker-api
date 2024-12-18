@@ -71,6 +71,14 @@ export class User extends BaseSchema {
   @Prop()
   @ApiProperty()
   otpExpiryTime: Date;
+
+  @Prop()
+  @ApiProperty()
+  currency: string;
+
+  @Prop()
+  @ApiProperty()
+  currencyName: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

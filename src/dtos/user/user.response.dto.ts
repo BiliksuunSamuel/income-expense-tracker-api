@@ -23,4 +23,7 @@ export class UserResponse extends BaseSchema {
 
   @ApiProperty()
   status: UserStatus;
+
+  @ApiProperty()
+  currency: string;
 }

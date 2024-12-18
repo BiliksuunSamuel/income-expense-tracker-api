@@ -9,6 +9,9 @@ import { TransactionModule } from './transaction/transaction.module';
 import { AuthMiddleware } from './middleware/auth.middleware';
 import { User, UserSchema } from './schemas/user.schema.dto';
 import { UserRepository } from './repositories/user.repository';
+import { BudgetCategoryModule } from './budget-category/budget-category.module';
+import { BudgetModule } from './budget/budget.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -23,6 +26,9 @@ import { UserRepository } from './repositories/user.repository';
     CategoryModule,
     TransactionModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    BudgetCategoryModule,
+    BudgetModule,
+    ReportsModule,
   ],
   controllers: [],
   providers: [UserRepository],

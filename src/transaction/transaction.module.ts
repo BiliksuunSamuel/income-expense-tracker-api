@@ -8,13 +8,23 @@ import {
 } from 'src/schemas/transaction.schema.dto';
 import { TransactionRepository } from 'src/repositories/transaction.repository';
 import { ImageService } from 'src/providers/image.service';
+import { Budget, BudgetSchema } from 'src/schemas/budget.schema.dto';
+import { BudgetActor } from 'src/actors/budget.actor';
+import { BudgetRepository } from 'src/repositories/budget.repository';
 
 @Module({
-  providers: [TransactionService, TransactionRepository, ImageService],
+  providers: [
+    TransactionService,
+    TransactionRepository,
+    BudgetRepository,
+    ImageService,
+    BudgetActor,
+  ],
   controllers: [TransactionController],
   imports: [
     MongooseModule.forFeature([
       { name: Transaction.name, schema: TransactionSchema },
+      { name: Budget.name, schema: BudgetSchema },
     ]),
   ],
 })

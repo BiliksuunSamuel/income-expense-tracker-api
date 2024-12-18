@@ -1,4 +1,12 @@
-import { Body, Controller, Patch, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Param,
+  Patch,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
@@ -11,11 +19,27 @@ import { UserRegisterRequest } from 'src/dtos/auth/user.register.request.dto';
 import { GoogleAuthUserRequestDto } from 'src/dtos/common/google.auth.user.request.dto';
 import { ResetPasswordRequestDto } from 'src/dtos/auth/reset.password.request.dto';
 import { ForgotPasswordRequestDto } from 'src/dtos/auth/forgot.password.request.dto';
+import { CurrencyRequest } from 'src/dtos/user/currency.request.dto';
 
 @Controller('api/authentication')
 @ApiTags('Authentication')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  //update user currency
+  @Patch('update-currency')
+  @UseGuards(JwtAuthGuard)
+  async updateUserCurrency(
+    @AuthUser() user: UserJwtDetails,
+    @Res() response: Response,
+    @Body() currency: CurrencyRequest,
+  ) {
+    const res = await this.authService.updateUserCurrencyAsync(
+      user.id,
+      currency,
+    );
+    response.status(res.code).send(res);
+  }
 
   @Post('register')
   async register(@Body() req: UserRegisterRequest, @Res() response: Response) {

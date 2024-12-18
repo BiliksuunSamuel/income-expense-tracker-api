@@ -59,6 +59,7 @@ export class TransactionRepository {
           $gte: today.setHours(0, 0, 0, 0),
           $lte: today.setHours(23, 59, 59, 999),
         },
+        userId: user.id,
       })
       .sort({ createdAt: -1 })
       .lean();
@@ -68,6 +69,7 @@ export class TransactionRepository {
           $gte: yesterday.setHours(0, 0, 0, 0),
           $lte: yesterday.setHours(23, 59, 59, 999),
         },
+        userId: user.id,
       })
       .sort({ createdAt: -1 })
       .lean();

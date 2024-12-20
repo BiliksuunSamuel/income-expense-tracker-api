@@ -3,7 +3,8 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 export default () => ({
-  port: parseInt(process.env.Port, 10) || 3000,
+  port:
+    parseInt(process.env.PORT, 10) || parseInt(process.env.Port, 10) || 3000,
   dbConnectionString: process.env.DbConnectionString,
   jwtScret: process.env.JwtSecret,
   senderId: process.env.SenderId,

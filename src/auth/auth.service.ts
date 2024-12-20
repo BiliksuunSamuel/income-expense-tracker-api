@@ -29,6 +29,7 @@ import { GoogleAuthUserInfo } from 'src/dtos/auth/google.auth.user.info.dto';
 import { ResetPasswordRequestDto } from 'src/dtos/auth/reset.password.request.dto';
 import { CommonResponses } from 'src/helper/common.responses.helper';
 import { CurrencyRequest } from 'src/dtos/user/currency.request.dto';
+import { UserResponse } from 'src/dtos/user/user.response.dto';
 
 @Injectable()
 export class AuthService {
@@ -40,6 +41,35 @@ export class AuthService {
     private readonly notificationActor: NotificationsActor,
     private readonly proxyHttpService: ProxyHttpService,
   ) {}
+
+  //get profile
+  async getProfile(
+    auth: UserJwtDetails,
+  ): Promise<ApiResponseDto<AuthResponse>> {
+    try {
+      const user = await this.userRepository.findOne({ id: auth.id }).lean();
+      if (!user) {
+        return CommonResponses.NotFoundResponse<AuthResponse>();
+      }
+      return CommonResponses.OkResponse<AuthResponse>(
+        {
+          user: toUserReponse(user),
+          token: await this.generateToken({
+            id: user.id,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            tokenId: user.tokenId,
+          }),
+        },
+        'User profile retrieved successfully',
+      );
+    } catch (error) {
+      this.logger.error('an error occurred while getting user profile', error);
+      return CommonResponses.InternalServerErrorResponse<AuthResponse>(
+        'An error occurred while getting user profile',
+      );
+    }
+  }
 
   //update user currency
   async updateUserCurrencyAsync(

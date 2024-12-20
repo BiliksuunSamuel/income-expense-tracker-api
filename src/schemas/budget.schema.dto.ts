@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { ApiProperty } from '@nestjs/swagger';
+import { BudgetStatus } from 'src/enums';
 
 @Schema()
 export class Budget {
@@ -50,6 +51,14 @@ export class Budget {
   @ApiProperty()
   @Prop()
   createdAt: Date;
+
+  @ApiProperty()
+  @Prop()
+  status: BudgetStatus;
+
+  @ApiProperty()
+  @Prop()
+  categoryId: string;
 }
 
 export const BudgetSchema = SchemaFactory.createForClass(Budget);

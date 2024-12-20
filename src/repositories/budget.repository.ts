@@ -15,6 +15,12 @@ export class BudgetRepository {
     @InjectModel(Budget.name) private readonly budgetRepository: Model<Budget>,
   ) {}
 
+  //delete budget
+  async deleteAsync(id: string): Promise<Budget> {
+    const res = await this.budgetRepository.findOneAndDelete({ id });
+    return res;
+  }
+
   //update budget
   async updateAsync(doc: Budget): Promise<Budget> {
     const { _id, id, ...others }: any = doc;
@@ -27,6 +33,35 @@ export class BudgetRepository {
   //get by id
   async getById(id: string): Promise<Budget> {
     return this.budgetRepository.findOne({ id }).lean();
+  }
+
+  //update budget
+  async update(
+    id: string,
+    request: BudgetRequest,
+    user: UserJwtDetails,
+  ): Promise<Budget> {
+    const doc = await this.getById(id);
+    if (!doc) {
+      return null;
+    }
+
+    const { _id, ...others }: any = doc;
+    const res = await this.budgetRepository
+      .findOneAndUpdate(
+        { id },
+        {
+          ...others,
+          ...request,
+          limitExceeded:
+            parseFloat(request.amount.toString()) <
+            parseFloat(doc.progressValue.toString()),
+          updatedAt: new Date(),
+        },
+        { new: true },
+      )
+      .lean();
+    return res;
   }
 
   //create budget

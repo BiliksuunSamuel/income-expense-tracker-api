@@ -55,6 +55,7 @@ export class TransactionRepository {
     yesterday.setDate(yesterday.getDate() - 1);
     const todayTransactions = await this.transactionRepository
       .find({
+        ...query,
         createdAt: {
           $gte: today.setHours(0, 0, 0, 0),
           $lte: today.setHours(23, 59, 59, 999),
@@ -65,6 +66,7 @@ export class TransactionRepository {
       .lean();
     const yesterdayTransactions = await this.transactionRepository
       .find({
+        ...query,
         createdAt: {
           $gte: yesterday.setHours(0, 0, 0, 0),
           $lte: yesterday.setHours(23, 59, 59, 999),
@@ -203,6 +205,7 @@ export class TransactionRepository {
       page: filter.page,
       pageSize: filter.pageSize,
     };
+
     return res;
   }
 

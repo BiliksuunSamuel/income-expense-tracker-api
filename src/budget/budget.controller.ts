@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -23,7 +25,13 @@ import { Budget } from 'src/schemas/budget.schema.dto';
 @UseGuards(JwtAuthGuard)
 export class BudgetController {
   constructor(private readonly budgetService: BudgetService) {}
-
+  //delete budget
+  @Delete(':id')
+  @ApiParam({ name: 'id', required: true })
+  async deleteBudget(@Param('id') id: string, @Res() response: Response) {
+    const res = await this.budgetService.deleteAsync(id);
+    response.status(res.code).send(res);
+  }
   //get budgets for dropdown
   @Get('dropdown')
   async getBudgetsForDropdown(
@@ -43,6 +51,19 @@ export class BudgetController {
     @Query() query: BudgetFilter,
   ) {
     const res = await this.budgetService.filterAsync(query, user);
+    response.status(res.code).send(res);
+  }
+
+  //update budget
+  @Patch(':id')
+  @ApiParam({ name: 'id', required: true })
+  async updateBudget(
+    @Param('id') id: string,
+    @Body() request: BudgetRequest,
+    @AuthUser() user: UserJwtDetails,
+    @Res() response: Response,
+  ) {
+    const res = await this.budgetService.updateAsync(id, request, user);
     response.status(res.code).send(res);
   }
 

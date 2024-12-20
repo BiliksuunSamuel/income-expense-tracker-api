@@ -32,3 +32,8 @@ export enum TransactionFilterPeriod {
   Month = 'Month',
   Year = 'Year',
 }
+
+export enum BudgetStatus {
+  Active = 'Active',
+  Closed = 'Closed',
+}

@@ -13,6 +13,44 @@ import { Budget } from 'src/schemas/budget.schema.dto';
 export class BudgetService {
   private readonly logger = new Logger(BudgetService.name);
   constructor(private readonly budgetRepository: BudgetRepository) {}
+  //delete budget
+  async deleteAsync(id: string): Promise<ApiResponseDto<Budget>> {
+    try {
+      this.logger.debug('request to delete budget', id);
+      const budget = await this.budgetRepository.deleteAsync(id);
+      if (!budget) {
+        return CommonResponses.NotFoundResponse<Budget>();
+      }
+      return CommonResponses.OkResponse(budget, 'Budget deleted successfully');
+    } catch (error) {
+      this.logger.error('an error occurred while deleting budget', id, error);
+      return CommonResponses.InternalServerErrorResponse<Budget>();
+    }
+  }
+  //update budget
+  async updateAsync(
+    id: string,
+    request: BudgetRequest,
+    user: UserJwtDetails,
+  ): Promise<ApiResponseDto<Budget>> {
+    try {
+      this.logger.debug('request to update budget', id, request, user);
+      const budget = await this.budgetRepository.update(id, request, user);
+      if (!budget) {
+        return CommonResponses.NotFoundResponse<Budget>();
+      }
+      return CommonResponses.OkResponse(budget, 'Budget updated successfully');
+    } catch (error) {
+      this.logger.error(
+        'an error occurred while updating budget',
+        id,
+        request,
+        user,
+        error,
+      );
+      return CommonResponses.InternalServerErrorResponse<Budget>();
+    }
+  }
 
   //create budtget
   async createAsync(

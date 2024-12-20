@@ -22,7 +22,9 @@ export class BudgetActor extends BaseActor {
           return;
         }
 
-        budget.progressValue = budget.progressValue + msg.amount;
+        budget.progressValue =
+          parseFloat(budget.progressValue.toString()) +
+          parseFloat(msg.amount.toString());
         budget.limitExceeded = budget.progressValue > budget.amount;
         budget.updatedAt = new Date();
         if (!budget.createdAt) {

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   Patch,
   Post,
@@ -25,6 +26,17 @@ import { CurrencyRequest } from 'src/dtos/user/currency.request.dto';
 @ApiTags('Authentication')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  //get profile
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  async getProfile(
+    @AuthUser() user: UserJwtDetails,
+    @Res() response: Response,
+  ) {
+    const res = await this.authService.getProfile(user);
+    response.status(res.code).send(res);
+  }
 
   //update user currency
   @Patch('update-currency')

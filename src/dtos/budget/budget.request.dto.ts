@@ -25,4 +25,9 @@ export class BudgetRequest {
   @ApiProperty()
   @IsNotEmpty()
   receiveAlertPercentage: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  categoryId: string;
 }

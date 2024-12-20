@@ -83,6 +83,9 @@ export class BudgetRepository {
     const query = {
       createdBy: user.id,
     };
+    if (filter.status && filter.status.length > 0) {
+      query['status'] = filter.status;
+    }
     if (filter.query) {
       query['$or'] = [
         { title: { $regex: filter.query, $options: 'i' } },

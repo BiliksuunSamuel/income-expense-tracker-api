@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { BudgetStatus } from 'src/enums';
 
 export class BudgetRequest {
   @ApiProperty({ required: true })
@@ -30,4 +31,9 @@ export class BudgetRequest {
   @IsString()
   @IsNotEmpty()
   categoryId: string;
+
+  @ApiProperty()
+  @IsEnum(BudgetStatus)
+  @IsNotEmpty()
+  status: BudgetStatus;
 }

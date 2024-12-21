@@ -21,11 +21,27 @@ import { GoogleAuthUserRequestDto } from 'src/dtos/common/google.auth.user.reque
 import { ResetPasswordRequestDto } from 'src/dtos/auth/reset.password.request.dto';
 import { ForgotPasswordRequestDto } from 'src/dtos/auth/forgot.password.request.dto';
 import { CurrencyRequest } from 'src/dtos/user/currency.request.dto';
+import { UpdateFcmTokenRequest } from 'src/dtos/user/update.fcm.token.request.dto';
 
 @Controller('api/authentication')
 @ApiTags('Authentication')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  //handle update user fcm token
+  @Patch('fcm-token')
+  @UseGuards(JwtAuthGuard)
+  async updateUserFcmToken(
+    @AuthUser() user: UserJwtDetails,
+    @Body() request: UpdateFcmTokenRequest,
+    @Res() response: Response,
+  ) {
+    const res = await this.authService.updateUserFcmTokenAsync(
+      user.id,
+      request.fcmToken,
+    );
+    response.status(res.code).send(res);
+  }
 
   //get profile
   @UseGuards(JwtAuthGuard)

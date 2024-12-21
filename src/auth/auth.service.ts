@@ -29,7 +29,6 @@ import { GoogleAuthUserInfo } from 'src/dtos/auth/google.auth.user.info.dto';
 import { ResetPasswordRequestDto } from 'src/dtos/auth/reset.password.request.dto';
 import { CommonResponses } from 'src/helper/common.responses.helper';
 import { CurrencyRequest } from 'src/dtos/user/currency.request.dto';
-import { UserResponse } from 'src/dtos/user/user.response.dto';
 
 @Injectable()
 export class AuthService {
@@ -41,6 +40,36 @@ export class AuthService {
     private readonly notificationActor: NotificationsActor,
     private readonly proxyHttpService: ProxyHttpService,
   ) {}
+
+  //handle update user fcm token
+  async updateUserFcmTokenAsync(
+    userId: string,
+    fcmToken: string,
+  ): Promise<ApiResponseDto<boolean>> {
+    try {
+      const user = await this.userRepo.updateUserFcmTokenAsync(
+        userId,
+        fcmToken,
+      );
+      if (!user) {
+        return CommonResponses.NotFoundResponse<boolean>();
+      }
+      return CommonResponses.OkResponse<boolean>(
+        true,
+        'User fcm token updated successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        'an error occurred while updating user fcm token\n',
+        userId,
+        fcmToken,
+        error,
+      );
+      return CommonResponses.InternalServerErrorResponse<boolean>(
+        'An error occurred while updating user fcm token',
+      );
+    }
+  }
 
   //get profile
   async getProfile(

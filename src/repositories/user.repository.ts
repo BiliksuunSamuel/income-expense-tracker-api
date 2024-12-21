@@ -13,6 +13,21 @@ export class UserRepository {
     @InjectModel(User.name) private readonly userRepository: Model<User>,
   ) {}
 
+  //update user fcm token
+  async updateUserFcmTokenAsync(
+    userId: string,
+    fcmToken: string,
+  ): Promise<User> {
+    const doc = await this.userRepository
+      .findOneAndUpdate(
+        { id: userId },
+        { $set: { fcmToken, updatedAt: new Date() } },
+        { new: true },
+      )
+      .lean();
+    return doc;
+  }
+
   async getByEmailAsync(email: string): Promise<User> {
     return await this.userRepository.findOne({ email }).lean();
   }

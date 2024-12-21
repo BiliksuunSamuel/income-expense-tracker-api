@@ -27,13 +27,13 @@ export class UserRegisterRequest {
   @ApiProperty()
   readonly lastName: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @ApiProperty()
-  currency: string;
+  // @IsString()
+  // @IsNotEmpty()
+  // @ApiProperty()
+  // currency: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @ApiProperty()
-  currencyName: string;
+  // @IsString()
+  // @IsNotEmpty()
+  // @ApiProperty()
+  // currencyName: string;
 }

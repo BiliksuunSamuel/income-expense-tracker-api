@@ -8,12 +8,17 @@ export class FirebaseService {
   private readonly logger = new Logger(FirebaseService.name);
 
   constructor() {
+    const serviceAccountconfig = serviceAccountConfig as any;
+
     if (!admin.apps.length) {
       admin.initializeApp({
-        credential: admin.credential.cert(
-          serviceAccountConfig as admin.ServiceAccount,
-        ),
+        credential: admin.credential.cert({
+          projectId: serviceAccountconfig.project_id,
+          privateKey: serviceAccountconfig.private_key,
+          clientEmail: serviceAccountconfig.client_email,
+        }),
       });
+      this.logger.log('Firebase app initialized');
     } else {
       this.logger.log('Firebase app already initialized');
     }

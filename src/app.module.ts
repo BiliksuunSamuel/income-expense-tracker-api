@@ -12,6 +12,7 @@ import { UserRepository } from './repositories/user.repository';
 import { BudgetCategoryModule } from './budget-category/budget-category.module';
 import { BudgetModule } from './budget/budget.module';
 import { ReportsModule } from './reports/reports.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -29,6 +30,9 @@ import { ReportsModule } from './reports/reports.module';
     BudgetCategoryModule,
     BudgetModule,
     ReportsModule,
+    HttpModule.register({
+      timeout: 5000,
+    }),
   ],
   controllers: [],
   providers: [UserRepository],

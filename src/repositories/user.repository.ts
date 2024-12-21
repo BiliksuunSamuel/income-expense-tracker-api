@@ -82,6 +82,7 @@ export class UserRepository {
               emailVerified: request.emailVerified,
               authenticated: true,
               resetPassword: false,
+              fcmToken: request.fcmToken,
             },
           },
           { new: true },

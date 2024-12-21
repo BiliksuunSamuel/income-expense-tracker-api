@@ -47,6 +47,7 @@ export class AuthService {
     fcmToken: string,
   ): Promise<ApiResponseDto<boolean>> {
     try {
+      this.logger.debug('updating user fcm token\n', userId, fcmToken);
       const user = await this.userRepo.updateUserFcmTokenAsync(
         userId,
         fcmToken,
@@ -281,6 +282,7 @@ export class AuthService {
         lastName: googleUserInfo.family_name,
         accessToken: request.accessToken,
         emailVerified: googleUserInfo.email_verified,
+        fcmToken: request.fcmToken,
       };
       const user = await this.userRepo.handleGoogleAuthAsync(data);
       if (!user) {
@@ -418,6 +420,7 @@ export class AuthService {
       user.tokenId = generateId();
       user.authenticated = true;
       user.emailVerified = true;
+      user.fcmToken = request.fcmToken;
       const { _id, ...others } = user as any;
       const res = await this.userRepo.updateAsync(user.email, { ...others });
       if (!res) {

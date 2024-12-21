@@ -28,7 +28,6 @@ import { MailService } from 'src/providers/mail.service';
     GoogleAuthStrategy,
     UserRepository,
     MailService,
-    ProxyHttpService,
   ],
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),

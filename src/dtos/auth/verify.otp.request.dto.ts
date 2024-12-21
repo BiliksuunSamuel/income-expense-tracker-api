@@ -5,4 +5,7 @@ export class VerifyOtpRequest {
   @ApiProperty()
   @IsNotEmpty()
   code: string;
+
+  @ApiProperty()
+  fcmToken: string;
 }

@@ -25,6 +25,22 @@ import { GroupedTransactionDto } from 'src/dtos/transaction/grouped.transaction.
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
+  //get transactions for budget
+  @Get('budget/:id')
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ type: [Transaction] })
+  async getTransactionsForBudget(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @AuthUser() user: UserJwtDetails,
+  ) {
+    const res = await this.transactionService.getTransactionsForBudget(
+      id,
+      user.id,
+    );
+    response.status(res.code).send(res);
+  }
+
   //get grouped transactions
   @Get('grouped')
   @ApiResponse({ type: GroupedTransactionDto })

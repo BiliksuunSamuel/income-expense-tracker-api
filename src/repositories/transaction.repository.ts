@@ -16,6 +16,17 @@ export class TransactionRepository {
     private readonly transactionRepository: Model<Transaction>,
   ) {}
 
+  //get transactions for budget
+  async getTransactionsForBudget(
+    budgetId: string,
+    userId: string,
+  ): Promise<Transaction[]> {
+    const transactions = await this.transactionRepository
+      .find({ $and: [{ budgetId }, { userId }] })
+      .lean();
+    return transactions;
+  }
+
   //get grouped transactions
   async getGroupedTransactions(
     filter: TransactionFilter,

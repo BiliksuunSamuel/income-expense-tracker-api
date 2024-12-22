@@ -22,6 +22,39 @@ export class TransactionService {
     private readonly budgetActor: BudgetActor,
   ) {}
 
+  //get budget transactions
+  async getTransactionsForBudget(
+    budgetId: string,
+    userId: string,
+  ): Promise<ApiResponseDto<Transaction[]>> {
+    try {
+      this.logger.debug(
+        'received request to get transactions for budget\n',
+        budgetId,
+        userId,
+      );
+      const transactions =
+        await this.transactionRepository.getTransactionsForBudget(
+          budgetId,
+          userId,
+        );
+
+      return CommonResponses.OkResponse(
+        transactions,
+        'Transactions for budget retrieved successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        'an error occurred while getting transactions for budget\n',
+        budgetId,
+        error,
+      );
+      return CommonResponses.InternalServerErrorResponse<Transaction[]>(
+        'An error occurred while getting transactions for budget',
+      );
+    }
+  }
+
   //get grouped transactions
   async getGroupedTransactions(
     filter: TransactionFilter,

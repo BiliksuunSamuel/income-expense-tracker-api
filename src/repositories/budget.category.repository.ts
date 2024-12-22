@@ -19,8 +19,10 @@ export class BudgetCategoryRepository {
     user: UserJwtDetails,
   ): Promise<boolean> {
     const count = await this.budgetCategoryRepository.countDocuments({
-      title,
-      userId: user,
+      $or: [
+        { title, createdBy: user.id },
+        { title, createdBy: 'General' },
+      ],
     });
     return count < 1;
   }
@@ -46,6 +48,8 @@ export class BudgetCategoryRepository {
 
   //get all for user
   async getAllForUser(user: UserJwtDetails): Promise<BudgetCategory[]> {
-    return this.budgetCategoryRepository.find({ createdBy: user.id }).lean();
+    return this.budgetCategoryRepository
+      .find({ $or: [{ createdBy: user.id }, { createdBy: 'General' }] })
+      .lean();
   }
 }

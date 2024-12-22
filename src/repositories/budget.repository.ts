@@ -6,6 +6,7 @@ import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { BudgetFilter } from 'src/dtos/budget/budget.filter.dto';
 import { BudgetForDropdownDto } from 'src/dtos/budget/budget.for.dropdown.dto';
 import { BudgetRequest } from 'src/dtos/budget/budget.request.dto';
+import { BudgetStatus } from 'src/enums';
 import { Budget } from 'src/schemas/budget.schema.dto';
 import { generateId } from 'src/utils';
 
@@ -120,7 +121,7 @@ export class BudgetRepository {
     user: UserJwtDetails,
   ): Promise<BudgetForDropdownDto[]> {
     const data = await this.budgetRepository
-      .find({ createdBy: user.id })
+      .find({ createdBy: user.id, status: BudgetStatus.Active })
       .lean();
     return data.map((x) => ({
       id: x.id,

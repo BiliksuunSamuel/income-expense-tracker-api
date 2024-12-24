@@ -38,6 +38,7 @@ export class TransactionRepository {
   ): Promise<Transaction[]> {
     const transactions = await this.transactionRepository
       .find({ $and: [{ budgetId }, { userId }] })
+      .sort({ createdAt: -1 })
       .lean();
     return transactions;
   }

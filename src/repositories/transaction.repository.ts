@@ -16,6 +16,21 @@ export class TransactionRepository {
     private readonly transactionRepository: Model<Transaction>,
   ) {}
 
+  //get total transactions amount for budget
+  async getTotalTransactionsAmountForBudget(
+    budgetId: string,
+    userId: string,
+  ): Promise<number> {
+    const transactions = await this.transactionRepository
+      .find({ $and: [{ budgetId }, { userId }] })
+      .lean();
+    const totalAmount = transactions.reduce(
+      (acc, item) => acc + item.amount,
+      0,
+    );
+    return totalAmount;
+  }
+
   //get transactions for budget
   async getTransactionsForBudget(
     budgetId: string,
@@ -161,8 +176,8 @@ export class TransactionRepository {
   }
 
   async createTransaction(transaction: Transaction): Promise<boolean> {
-    var res = await this.transactionRepository.create(transaction);
-    return res ? true : false;
+    await this.transactionRepository.create(transaction);
+    return true;
   }
 
   async getTransactions(

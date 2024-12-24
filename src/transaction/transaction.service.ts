@@ -201,6 +201,78 @@ export class TransactionService {
     }
   }
 
+  //update transaction
+  async updateTransaction(
+    id: string,
+    request: TransactionRequest,
+    user: UserJwtDetails,
+  ): Promise<ApiResponseDto<boolean>> {
+    try {
+      const doc = await this.transactionRepository.getTransactionById(id);
+      if (!doc) {
+        return CommonResponses.NotFoundResponse('Transaction not found');
+      }
+
+      const updatedDoc: Transaction = {
+        ...doc,
+        amount: request.amount,
+        repeatFrequency: request.repeatFrequency,
+        repeatInterval: request.repeatInterval,
+        repeatTransactionEndDate: request.repeatTransactionEndDate,
+        repeatTransaction: request.repeatTransaction,
+        description: request.description,
+        category: request.category,
+        budgetId: request.budgetId,
+      };
+
+      if (request.invoice) {
+        const base64String = `data:${convertFileExtensionToBase64FileType(request.invoiceFileType)};base64,${request.invoice}`;
+        const invoice = await this.imageService.cloudinaryUpload(base64String);
+        updatedDoc.invoiceUrl = invoice?.secure_url;
+        updatedDoc.invoiceFileName = request.invoiceFileName;
+        updatedDoc.invoiceFileType = request.invoiceFileName;
+      }
+
+      const res = await this.transactionRepository.updateTransaction(
+        id,
+        updatedDoc,
+      );
+
+      if (!res) {
+        return CommonResponses.FaildedDependencyResponse<boolean>(
+          'Sorry, an error occured',
+        );
+      }
+
+      if (updatedDoc.budgetId) {
+        const totalAmount =
+          await this.transactionRepository.getTotalTransactionsAmountForBudget(
+            updatedDoc.budgetId,
+            updatedDoc.userId,
+          );
+        dispatch(
+          this.budgetActor.updateBudgetDetailsWhenTransactionDetailsIsUpdated,
+          { budgetId: updatedDoc.budgetId, amount: totalAmount },
+        );
+      }
+
+      return CommonResponses.OkResponse(
+        true,
+        'Transaction updated successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        'an error occurred while updating transaction',
+        user,
+        request,
+        error,
+      );
+      return CommonResponses.InternalServerErrorResponse(
+        'An error occurred while updating transaction',
+      );
+    }
+  }
+
   //create transaction
   async createTransaction(
     request: TransactionRequest,

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -37,6 +38,22 @@ export class TransactionController {
     const res = await this.transactionService.getTransactionsForBudget(
       id,
       user.id,
+    );
+    response.status(res.code).send(res);
+  }
+  //update transaction
+  @Patch(':id')
+  @ApiParam({ name: 'id', type: String })
+  async updateTransaction(
+    @Param('id') id: string,
+    @Body() request: TransactionRequest,
+    @Res() response: Response,
+    @AuthUser() user: UserJwtDetails,
+  ) {
+    const res = await this.transactionService.updateTransaction(
+      id,
+      request,
+      user,
     );
     response.status(res.code).send(res);
   }

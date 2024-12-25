@@ -35,6 +35,6 @@ export class EventGatewayService {
     @MessageBody() payload: any,
   ) {
     this.logger.debug('sign in event received', payload);
-    client.emit('signIn', payload);
+    this.server.emit('signIn', payload);
   }
 }

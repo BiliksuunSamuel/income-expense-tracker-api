@@ -26,4 +26,7 @@ export class UserResponse extends BaseSchema {
 
   @ApiProperty()
   currency: string;
+
+  @ApiProperty()
+  tokenId: string;
 }

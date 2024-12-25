@@ -26,6 +26,24 @@ import { GroupedTransactionDto } from 'src/dtos/transaction/grouped.transaction.
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
+  //export transactions
+  @Get('export')
+  @ApiResponse({ type: Transaction })
+  async exportTransactions(
+    @Query() filter: TransactionFilter,
+    @Res() response: Response,
+    @AuthUser() user: UserJwtDetails,
+  ) {
+    const res = await this.transactionService.exportTransactions(filter, user);
+    //prepare pdf report file
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename=transactions-${new Date().toISOString()}.pdf`,
+    );
+    response.send(res);
+  }
+
   //get transactions for budget
   @Get('budget/:id')
   @ApiParam({ name: 'id', type: String })

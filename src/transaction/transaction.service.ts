@@ -6,6 +6,7 @@ import { PagedResults } from 'src/common/paged.results.dto';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { GroupedTransactionDto } from 'src/dtos/transaction/grouped.transaction.dto';
 import { TransactionFilter } from 'src/dtos/transaction/transaction.filter.dto';
+import { TransactionForExport } from 'src/dtos/transaction/transaction.for.export.dto';
 import { TransactionRequest } from 'src/dtos/transaction/transaction.request.dto';
 import { CommonResponses } from 'src/helper/common.responses.helper';
 import { ImageService } from 'src/providers/image.service';
@@ -21,6 +22,43 @@ export class TransactionService {
     private readonly imageService: ImageService,
     private readonly budgetActor: BudgetActor,
   ) {}
+
+  //get transactions for export to pdf
+  async exportTransactions(
+    filter: TransactionFilter,
+    user: UserJwtDetails,
+  ): Promise<ApiResponseDto<TransactionForExport[]>> {
+    try {
+      const transactions =
+        await this.transactionRepository.getTransactionsForExport(filter, user);
+
+      //prepare data for export to pdf
+      const data: TransactionForExport[] = transactions.map((item) => {
+        return {
+          amount: item.amount,
+          description: item.description,
+          category: item.category,
+          currency: item.currency,
+          createdAt: item.createdAt,
+        };
+      });
+
+      return CommonResponses.OkResponse(
+        data,
+        'Transactions for export to pdf retrieved successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        'an error occurred while getting transactions for export to pdf\n',
+        user,
+        filter,
+        error,
+      );
+      return CommonResponses.InternalServerErrorResponse<Transaction[]>(
+        'An error occurred while getting transactions for export to pdf',
+      );
+    }
+  }
 
   //get budget transactions
   async getTransactionsForBudget(

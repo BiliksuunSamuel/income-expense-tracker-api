@@ -181,6 +181,50 @@ export class TransactionRepository {
     return true;
   }
 
+  async getTransactionsForExport(
+    filter: TransactionFilter,
+    user: UserJwtDetails,
+  ): Promise<Transaction[]> {
+    const query: any = {
+      userId: user.id,
+    };
+    if (filter.currency) {
+      query.currency = filter.currency;
+    }
+    if (filter.category) {
+      query.category = filter.category;
+    }
+    if (filter.type) {
+      query.type = filter.type;
+    }
+    if (filter.repeatTransaction != null) {
+      query.repeatTransaction = filter.repeatTransaction;
+    }
+    if (filter.budgetId) {
+      query.budgetId = filter.budgetId;
+    }
+    if (filter.query) {
+      query.$or = [
+        { category: { $regex: filter.query, $options: 'i' } },
+        { description: { $regex: filter.query, $options: 'i' } },
+      ];
+    }
+    if (filter.period) {
+      const { startDate, endDate } =
+        convertTransactionFilterPeriodToDateTimeRange(filter.period);
+      query.createdAt = {
+        $gte: startDate,
+        $lte: endDate,
+      };
+    }
+    const data = await this.transactionRepository
+      .find(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return data;
+  }
+
   async getTransactions(
     filter: TransactionFilter,
     user: UserJwtDetails,

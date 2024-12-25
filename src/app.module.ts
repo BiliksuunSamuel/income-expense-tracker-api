@@ -13,6 +13,7 @@ import { BudgetCategoryModule } from './budget-category/budget-category.module';
 import { BudgetModule } from './budget/budget.module';
 import { ReportsModule } from './reports/reports.module';
 import { HttpModule } from '@nestjs/axios';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { HttpModule } from '@nestjs/axios';
     HttpModule.register({
       timeout: 5000,
     }),
+    EventsModule,
   ],
   controllers: [],
   providers: [UserRepository],

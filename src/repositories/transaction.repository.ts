@@ -247,13 +247,26 @@ export class TransactionRepository {
     if (filter.budgetId) {
       query.budgetId = filter.budgetId;
     }
+    if (filter.startDate && filter.endDate) {
+      const startDate = new Date(
+        new Date(filter.startDate).setHours(0, 0, 0, 0),
+      );
+      var endDate = new Date(
+        new Date(filter.endDate).setHours(23, 59, 59, 999),
+      );
+      query.createdAt = {
+        $gte: startDate,
+        $lte: endDate,
+      };
+    }
+
     if (filter.query) {
       query.$or = [
         { category: { $regex: filter.query, $options: 'i' } },
         { description: { $regex: filter.query, $options: 'i' } },
       ];
     }
-    if (filter.period) {
+    if (filter.period && filter.period.length > 1) {
       const { startDate, endDate } =
         convertTransactionFilterPeriodToDateTimeRange(filter.period);
       query.createdAt = {

@@ -20,4 +20,10 @@ export class TransactionFilter extends BaseFilter {
 
   @ApiProperty({ required: false, default: null })
   budgetId: string;
+
+  @ApiProperty({ required: false, default: null })
+  startDate: Date;
+
+  @ApiProperty({ required: false, default: null })
+  endDate: Date;
 }

@@ -18,6 +18,9 @@ import { ProxyHttpService } from 'src/providers/proxy-http.service';
 import { HttpModule } from '@nestjs/axios';
 import { User, UserSchema } from 'src/schemas/user.schema.dto';
 import { UserRepository } from 'src/repositories/user.repository';
+import { Category, CategorySchema } from 'src/schemas/category.schema';
+import { CategoryActor } from 'src/actors/category.actor';
+import { CategoryRepository } from 'src/repositories/category.repository';
 
 @Module({
   providers: [
@@ -31,6 +34,8 @@ import { UserRepository } from 'src/repositories/user.repository';
     FirebaseService,
     MailService,
     UserRepository,
+    CategoryActor,
+    CategoryRepository,
   ],
   controllers: [TransactionController],
   imports: [
@@ -38,6 +43,7 @@ import { UserRepository } from 'src/repositories/user.repository';
       { name: Transaction.name, schema: TransactionSchema },
       { name: Budget.name, schema: BudgetSchema },
       { name: User.name, schema: UserSchema },
+      { name: Category.name, schema: CategorySchema },
     ]),
     HttpModule.register({
       timeout: 5000,

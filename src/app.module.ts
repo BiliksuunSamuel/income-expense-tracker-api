@@ -14,6 +14,8 @@ import { BudgetModule } from './budget/budget.module';
 import { ReportsModule } from './reports/reports.module';
 import { HttpModule } from '@nestjs/axios';
 import { EventsModule } from './events/events.module';
+import { JobSchedulerService } from './providers/job.scheduler.service';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -35,9 +37,10 @@ import { EventsModule } from './events/events.module';
       timeout: 5000,
     }),
     EventsModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [],
-  providers: [UserRepository],
+  providers: [UserRepository, JobSchedulerService],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {

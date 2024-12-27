@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { dispatch } from 'nact';
 import { BudgetActor } from 'src/actors/budget.actor';
+import { CategoryActor } from 'src/actors/category.actor';
 import { ApiResponseDto } from 'src/common/api.response.dto';
 import { PagedResults } from 'src/common/paged.results.dto';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
@@ -21,6 +22,7 @@ export class TransactionService {
     private readonly transactionRepository: TransactionRepository,
     private readonly imageService: ImageService,
     private readonly budgetActor: BudgetActor,
+    private readonly categoryActor: CategoryActor,
   ) {}
 
   //get transactions for export to pdf
@@ -294,6 +296,12 @@ export class TransactionService {
         );
       }
 
+      //produce event to add categor for user if it doesnt exist
+      dispatch(this.categoryActor.createNewCategory, {
+        creatorId: user.id,
+        title: updatedDoc.category,
+      });
+
       return CommonResponses.OkResponse(
         true,
         'Transaction updated successfully',
@@ -342,6 +350,12 @@ export class TransactionService {
       if (transaction.budgetId) {
         dispatch(this.budgetActor.updateBudgetDetails, transaction);
       }
+
+      //produce event to add category for user if it doesnt exist
+      dispatch(this.categoryActor.createNewCategory, {
+        creatorId: user.id,
+        title: transaction.category,
+      });
 
       return CommonResponses.OkResponse(true, 'Transaction added successfully');
     } catch (error) {

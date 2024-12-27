@@ -46,4 +46,14 @@ export class CategoryRepository {
     const newCategory = doc.toObject();
     return newCategory;
   }
+
+  //get category by title
+  //this is used to check if a category with the same title exists
+  //ignore the casing of the title
+  async getCategoryByTitle(title: string): Promise<Category> {
+    const category = await this.categoryRepository
+      .findOne({ title: { $regex: new RegExp(title, 'i') } })
+      .lean();
+    return category;
+  }
 }

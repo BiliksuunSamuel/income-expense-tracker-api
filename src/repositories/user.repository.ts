@@ -101,6 +101,7 @@ export class UserRepository {
       id: generateId(),
       status: UserStatus.Active,
       tokenId: generateId(),
+      authenticated: true,
     });
     const data = await this.getByIdAsync(res.id);
     return data;

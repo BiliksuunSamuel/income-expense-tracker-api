@@ -15,4 +15,7 @@ export default () => ({
   emailPassword: process.env.EmailPassword,
   emailUsername: process.env.EmailUserName,
   googleAuthUrl: process.env.GoogleAuthUrl,
+  firebaseProjectId: process.env.FirebaseProjectId,
+  firebasePrivateKey: process.env.FirebasePrivateKey,
+  firebaseClientEmail: process.env.FirebaseClientEmail,
 });

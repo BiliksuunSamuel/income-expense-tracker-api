@@ -241,6 +241,41 @@ export class TransactionService {
     }
   }
 
+  async deleteTransaction(id: string): Promise<ApiResponseDto<Transaction>> {
+    try {
+      const res = await this.transactionRepository.deleteTransaction(id);
+      if (!res) {
+        return CommonResponses.NotFoundResponse<Transaction>(
+          'Transaction not found',
+        );
+      }
+      if (res.budgetId) {
+        const totalAmount =
+          await this.transactionRepository.getTotalTransactionsAmountForBudget(
+            res.budgetId,
+            res.userId,
+          );
+        dispatch(
+          this.budgetActor.updateBudgetDetailsWhenTransactionDetailsIsUpdated,
+          { budgetId: res.budgetId, amount: totalAmount },
+        );
+      }
+      return CommonResponses.OkResponse(
+        res,
+        'Transaction removed successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        'an error occurred while deleting transaction\n',
+        id,
+        error,
+      );
+      return CommonResponses.InternalServerErrorResponse<Transaction>(
+        'An error occurred while removing transaction',
+      );
+    }
+  }
+
   //update transaction
   async updateTransaction(
     id: string,
@@ -296,7 +331,7 @@ export class TransactionService {
         );
       }
 
-      //produce event to add categor for user if it doesnt exist
+      //produce event to add category for user if it doesnt exist
       dispatch(this.categoryActor.createNewCategory, {
         creatorId: user.id,
         title: updatedDoc.category,

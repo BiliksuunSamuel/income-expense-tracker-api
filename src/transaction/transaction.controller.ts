@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -149,6 +150,14 @@ export class TransactionController {
     @AuthUser() user: UserJwtDetails,
   ) {
     const res = await this.transactionService.createTransaction(request, user);
+    response.status(res.code).send(res);
+  }
+
+  //delete transaction
+  @Delete(':id')
+  @ApiParam({ name: 'id', type: String })
+  async deleteTransaction(@Param('id') id: string, @Res() response: Response) {
+    const res = await this.transactionService.deleteTransaction(id);
     response.status(res.code).send(res);
   }
 }

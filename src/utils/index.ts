@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import * as otpGenerator from 'otp-generator';
 import * as phoneNumberParser from 'libphonenumber-js';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { TransactionFilterPeriod } from 'src/enums';
 
 //hash password

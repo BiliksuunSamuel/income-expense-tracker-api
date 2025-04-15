@@ -23,6 +23,7 @@ import { ScheduleModule } from '@nestjs/schedule';
       envFilePath: '.env',
       isGlobal: true,
       load: [configuration],
+      ignoreEnvFile: true,
     }),
     MongooseModule.forRoot(configuration().dbConnectionString),
     UserModule,

@@ -16,6 +16,6 @@ export default () => ({
   emailUsername: process.env.EmailUserName,
   googleAuthUrl: process.env.GoogleAuthUrl,
   firebaseProjectId: process.env.FirebaseProjectId,
-  firebasePrivateKey: process.env.FirebasePrivateKey,
+  firebasePrivateKey: process.env.FirebasePrivateKey?.replace(/\\n/g, '\n'),
   firebaseClientEmail: process.env.FirebaseClientEmail,
 });

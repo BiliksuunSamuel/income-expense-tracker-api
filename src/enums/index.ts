@@ -37,3 +37,14 @@ export enum BudgetStatus {
   Active = 'Active',
   Closed = 'Closed',
 }
+
+export enum BillingPlanType {
+  Regular = 'Regular',
+  Premium = 'Premium',
+  Pro = 'Pro',
+}
+
+export enum BillingFrequency {
+  Monthly = 'Monthly',
+  Yearly = 'Yearly',
+}

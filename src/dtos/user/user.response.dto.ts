@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole, UserStatus } from 'src/enums';
-import { BaseSchema } from 'src/schemas/base.schema.dto';
+import { BaseSchema } from 'src/schemas';
 
 export class UserResponse extends BaseSchema {
   @ApiProperty()

@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { BudgetCategoryRequestDto } from 'src/dtos/budget-category/budget.category.request.dto';
-import { BudgetCategory } from 'src/schemas/budget.category.schema.dto';
+import { BudgetCategory } from 'src/schemas/budget.category.schema';
 import { generateId } from 'src/utils';
 
 @Injectable()

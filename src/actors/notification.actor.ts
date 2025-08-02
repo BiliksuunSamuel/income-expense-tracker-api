@@ -2,10 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { spawnStateless } from 'nact';
 import { BaseActor } from './base.actor';
 import { FcmNotificationRequest } from 'src/dtos/notification/fcm.notification.request.dto';
-import { ProxyHttpService } from 'src/providers/proxy-http.service';
-import { FirebaseService } from 'src/providers/firebase.service';
+import { ProxyHttpService } from 'src/services/proxy-http.service';
+import { FirebaseService } from 'src/services/firebase.service';
 import { SendSmsRequest } from 'src/common';
-import { MailService } from 'src/providers/mail.service';
+import { MailService } from 'src/services/mail.service';
 
 @Injectable()
 export class NotificationsActor extends BaseActor {

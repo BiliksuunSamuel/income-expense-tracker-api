@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { FinancialReportFilter } from 'src/dtos/common/financial.report.filter';
 import { FinancialReportResponse } from 'src/dtos/common/financial.report.response';
-import { Transaction } from 'src/schemas/transaction.schema.dto';
+import { Transaction } from 'src/schemas/transaction.schema';
 
 @Injectable()
 export class ReportsRepository {

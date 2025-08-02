@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BaseActor } from './base.actor';
 import { BudgetRepository } from 'src/repositories/budget.repository';
 import { dispatch, spawnStateless } from 'nact';
-import { Transaction } from 'src/schemas/transaction.schema.dto';
+import { Transaction } from 'src/schemas/transaction.schema';
 import { NotificationsActor } from './notification.actor';
 import { FcmNotificationRequest } from 'src/dtos/notification/fcm.notification.request.dto';
 import { UserRepository } from 'src/repositories/user.repository';

@@ -7,7 +7,7 @@ import { BudgetFilter } from 'src/dtos/budget/budget.filter.dto';
 import { BudgetForDropdownDto } from 'src/dtos/budget/budget.for.dropdown.dto';
 import { BudgetRequest } from 'src/dtos/budget/budget.request.dto';
 import { BudgetStatus } from 'src/enums';
-import { Budget } from 'src/schemas/budget.schema.dto';
+import { Budget } from 'src/schemas/budget.schema';
 import { generateId } from 'src/utils';
 
 @Injectable()

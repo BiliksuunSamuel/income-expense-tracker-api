@@ -1,9 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import configuration from './configuration';
 import { ValidationPipe } from '@nestjs/common';
 import * as bodyParser from 'body-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppModule } from './modules/app.module';
+import { HttpExceptionFilter } from './middleware/http.exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,6 +15,8 @@ async function bootstrap() {
 
   //
 
+  // global exception filter
+  app.useGlobalFilters(new HttpExceptionFilter());
   ///
   const config = new DocumentBuilder()
     .setTitle('Income Expense Tracker')

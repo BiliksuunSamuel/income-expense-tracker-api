@@ -1,22 +1,21 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { ApiProperty } from '@nestjs/swagger';
-import { CategoryType } from 'src/enums';
 
 @Schema()
-export class Category {
-  @Prop()
+export class BudgetCategory {
   @ApiProperty()
+  @Prop()
   id: string;
 
-  @Prop()
   @ApiProperty()
+  @Prop({ type: String, required: true })
   title: string;
 
-  @Prop()
   @ApiProperty()
-  creatorId: string;
+  @Prop({ type: String })
+  description: string;
 
-  @Prop()
   @ApiProperty()
-  type: CategoryType;
+  @Prop({ type: String, required: true })
+  createdBy: string;
 }

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transaction } from 'src/schemas/transaction.schema.dto';
+import { Transaction } from 'src/schemas/transaction.schema';
 
 export class GroupedTransactionDto {
   @ApiProperty({ type: [Transaction] })

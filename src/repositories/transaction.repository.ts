@@ -6,7 +6,7 @@ import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { GroupedTransactionDto } from 'src/dtos/transaction/grouped.transaction.dto';
 import { TransactionFilter } from 'src/dtos/transaction/transaction.filter.dto';
 import { TransactionFilterPeriod } from 'src/enums';
-import { Transaction } from 'src/schemas/transaction.schema.dto';
+import { Transaction } from 'src/schemas/transaction.schema';
 import { convertTransactionFilterPeriodToDateTimeRange } from 'src/utils';
 
 @Injectable()

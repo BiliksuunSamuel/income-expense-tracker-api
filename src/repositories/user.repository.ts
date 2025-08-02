@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { GoogleAuthRequestDto } from 'src/dtos/auth/google.auth.request.dto';
 import { UserStatus } from 'src/enums';
-import { User } from 'src/schemas/user.schema.dto';
+import { User } from 'src/schemas/user.schema';
 import { generateId } from 'src/utils';
 
 @Injectable()

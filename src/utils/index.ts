@@ -2,7 +2,9 @@ import { randomUUID } from 'crypto';
 import * as otpGenerator from 'otp-generator';
 import * as phoneNumberParser from 'libphonenumber-js';
 import * as bcrypt from 'bcryptjs';
-import { TransactionFilterPeriod } from 'src/enums';
+import { BillingFrequency, TransactionFilterPeriod } from 'src/enums';
+import { BillingPlan } from 'src/schemas/billing.plan.schema';
+import { Subscription } from 'src/schemas/subscription.schema';
 
 //hash password
 export async function hashPassword(password: string): Promise<string> {
@@ -137,4 +139,62 @@ export function convertTransactionFilterPeriodToDateTimeRange(
       );
   }
   return { startDate, endDate };
+}
+
+export function calculateYearlyPrice(plan: BillingPlan): BillingPlan {
+  const yearlyPrice = plan.price * 12;
+  const discount = (yearlyPrice * plan.yearlyDiscount) / 100;
+  plan.yearlyPrice = yearlyPrice - discount;
+  return plan;
+}
+
+export function getInvoiceStartDateAndEndDate(subscription: Subscription): {
+  startDate: Date;
+  endDate: Date;
+} {
+  if (subscription.billingFrequency === BillingFrequency.Monthly) {
+    const startDate = new Date(subscription.startDate);
+    //add 30 days to start date for monthly billing
+    const endDate = new Date(
+      startDate.getFullYear(),
+      startDate.getMonth(),
+      startDate.getDate() + 30,
+      23,
+      59,
+      59,
+    );
+    return { startDate, endDate };
+  }
+  const startDate = new Date(subscription.startDate);
+  const endDate = new Date(
+    startDate.getFullYear() + 1,
+    startDate.getMonth(),
+    startDate.getDate() - 1,
+    23,
+    59,
+    59,
+  );
+  return { startDate, endDate };
+}
+
+export function getInvoiceAmount(
+  billingPlan: BillingPlan,
+  frequency: BillingFrequency,
+): number {
+  if (frequency === BillingFrequency.Monthly) {
+    return billingPlan.price;
+  }
+  return calculateYearlyPrice(billingPlan).yearlyPrice;
+}
+
+//generate invoice number
+export function generateInvoiceNumber(): string {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2); // last two digits of the year
+  const month = (date.getMonth() + 1).toString().padStart(2, '0'); // month in two digits
+  const day = date.getDate().toString().padStart(2, '0'); // day in two digits
+  const randomPart = Math.floor(Math.random() * 10000)
+    .toString()
+    .padStart(4, '0'); // random four-digit number
+  return `INV-${year}${month}${day}-${randomPart}`;
 }

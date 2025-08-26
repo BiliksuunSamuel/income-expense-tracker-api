@@ -76,4 +76,12 @@ export class Transaction extends BaseSchema {
   @Prop({ default: null })
   @ApiProperty()
   budgetId: string;
+
+  @Prop({ default: null })
+  @ApiProperty()
+  invoiceId: string;
+
+  @Prop({ default: null })
+  @ApiProperty()
+  subscriptionId: string;
 }

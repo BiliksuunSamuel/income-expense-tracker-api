@@ -48,3 +48,20 @@ export enum BillingFrequency {
   Monthly = 'Monthly',
   Yearly = 'Yearly',
 }
+
+export enum PaymentStatus {
+  Pending = 'Pending',
+  Completed = 'Completed',
+  Failed = 'Failed',
+  Refunded = 'Refunded',
+  Processing = 'Processing',
+}
+
+export enum SubscriptionStatus {
+  Active = 'Active',
+  Inactive = 'Inactive',
+  Cancelled = 'Cancelled',
+  Expired = 'Expired',
+  Closed = 'Closed',
+  Pending = 'Pending',
+}

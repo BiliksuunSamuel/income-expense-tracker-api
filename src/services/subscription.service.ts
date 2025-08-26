@@ -1,16 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { dispatch } from 'nact';
+import { InvoiceActor } from 'src/actors/invoice.actor';
 import { ApiResponseDto } from 'src/common/api.response.dto';
 import { PagedResults } from 'src/common/paged.results.dto';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { SubscriptionRequestDto } from 'src/dtos/billing-plan/subscription-request.dto';
 import { SubscriptionResponse } from 'src/dtos/billing-plan/subscription-response.dto';
 import { SubscriptionsFilter } from 'src/dtos/billing-plan/subscriptions-filter.dto';
+import { BillingPlanType, SubscriptionStatus } from 'src/enums';
 import { CommonResponses } from 'src/helper/common.responses.helper';
+import { UserRepository } from 'src/repositories/user.repository';
 import { BillingPlan } from 'src/schemas/billing.plan.schema';
 import { Subscription } from 'src/schemas/subscription.schema';
-import { generateId } from 'src/utils';
+import { calculateYearlyPrice, generateId } from 'src/utils';
 
 @Injectable()
 export class SubscriptionService {
@@ -20,6 +24,8 @@ export class SubscriptionService {
     private readonly subscriptionModel: Model<Subscription>,
     @InjectModel(BillingPlan.name)
     private readonly billingPlanModel: Model<BillingPlan>,
+    private readonly invoiceActor: InvoiceActor,
+    private readonly userRepository: UserRepository,
   ) {}
 
   //buy subscription
@@ -35,20 +41,43 @@ export class SubscriptionService {
         this.logger.error('Billing plan not found', request, authUser);
         return CommonResponses.NotFoundResponse('Billing plan not found');
       }
+
+      if (billingPlan.title === BillingPlanType.Regular) {
+        const planAlreadyPurchased = await this.subscriptionModel.findOne({
+          userId: authUser.id,
+          planTitle: billingPlan.title,
+        });
+        if (planAlreadyPurchased) {
+          //this plan is a one time purchase plan
+          this.logger.warn('User already has a regular plan', {
+            userId: authUser.id,
+            planTitle: billingPlan.title,
+          });
+          return CommonResponses.ForbiddenResponse(
+            'This plan is a one time purchase plan, please choose another plan.',
+          );
+        }
+      }
+
       const subscription = await this.subscriptionModel.create({
         ...request,
         userId: authUser.id,
         isActive: true,
         startDate: new Date(),
-        //end date in 5 yrs time
-        endDate: new Date(new Date().getTime() + 5 * 365 * 24 * 60 * 60 * 1000),
+        endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
         planTitle: billingPlan.title,
         id: generateId(),
         createdAt: new Date(),
         createdBy: authUser?.email,
+        status:
+          billingPlan.price == 0
+            ? SubscriptionStatus.Active
+            : SubscriptionStatus.Pending,
+        maxNumberOfTransactions: billingPlan.maxNumberOfTransactions || 0,
+        billingPlanId: billingPlan.id,
       });
       this.logger.log(
-        'Subscription created successfully',
+        'Subscription created successfully. Please settle your invoice to activate it.',
         subscription.toObject(),
         request,
         authUser,
@@ -59,11 +88,32 @@ export class SubscriptionService {
         endDate: doc.endDate,
         isActive: doc.isActive,
         planTitle: doc.planTitle,
-        plan: billingPlan,
+        plan: calculateYearlyPrice(billingPlan),
+        maxNumberOfTransactions: doc.maxNumberOfTransactions,
+        status: doc.status,
+        billingFrequency: doc.billingFrequency,
+        id: doc.id,
+        createdAt: doc.createdAt,
+        createdBy: doc.createdBy,
+        updatedAt: doc.updatedAt,
+        updatedBy: doc.updatedBy,
       };
+      // Create invoice for the subscription
+      dispatch(this.invoiceActor.createInvoiceForSubscription, {
+        subscription,
+        billingPlan,
+      });
+
+      //Close other subscriptions for the user
+      await this.subscriptionModel.updateMany(
+        { userId: authUser.id, id: { $ne: subscription.id } },
+        { isActive: false, status: SubscriptionStatus.Closed },
+      );
       return CommonResponses.OkResponse(
         response,
-        'Subscription created successfully',
+        billingPlan.price <= 0
+          ? 'Subscription created successfully.'
+          : 'Subscription created successfully. Please settle your invoice to activate it.',
       );
     } catch (error) {
       this.logger.error(
@@ -82,7 +132,7 @@ export class SubscriptionService {
   ): Promise<ApiResponseDto<SubscriptionResponse>> {
     try {
       const activeSubscription = await this.subscriptionModel
-        .findOne({ isActive: true, userId })
+        .findOne({ userId, isActive: true })
         .lean();
       if (!activeSubscription) {
         this.logger.warn('No active subscription found for user', { userId });
@@ -107,7 +157,15 @@ export class SubscriptionService {
         endDate: activeSubscription.endDate,
         isActive: activeSubscription.isActive,
         planTitle: activeSubscription.planTitle,
-        plan: billingPlan,
+        plan: calculateYearlyPrice(billingPlan),
+        maxNumberOfTransactions: activeSubscription.maxNumberOfTransactions,
+        status: activeSubscription.status,
+        billingFrequency: activeSubscription.billingFrequency,
+        id: activeSubscription.id,
+        createdAt: activeSubscription.createdAt,
+        createdBy: activeSubscription.createdBy,
+        updatedAt: activeSubscription.updatedAt,
+        updatedBy: activeSubscription.updatedBy,
       };
       this.logger.log('User active subscription fetched successfully', {
         userId,
@@ -132,7 +190,7 @@ export class SubscriptionService {
     id: string,
   ): Promise<ApiResponseDto<SubscriptionResponse>> {
     try {
-      const subscription = await this.subscriptionModel.findById(id).lean();
+      const subscription = await this.subscriptionModel.findOne({ id }).lean();
       if (!subscription) {
         this.logger.warn('Subscription not found', { id });
         return CommonResponses.NotFoundResponse('Subscription not found');
@@ -149,7 +207,15 @@ export class SubscriptionService {
         endDate: subscription.endDate,
         isActive: subscription.isActive,
         planTitle: subscription.planTitle,
-        plan: billingPlan,
+        plan: calculateYearlyPrice(billingPlan),
+        maxNumberOfTransactions: subscription.maxNumberOfTransactions,
+        status: subscription.status,
+        billingFrequency: subscription.billingFrequency,
+        id: subscription.id,
+        createdAt: subscription.createdAt,
+        createdBy: subscription.createdBy,
+        updatedAt: subscription.updatedAt,
+        updatedBy: subscription.updatedBy,
       };
       this.logger.log('Subscription fetched successfully', { id, response });
       return CommonResponses.OkResponse(

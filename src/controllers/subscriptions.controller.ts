@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
@@ -6,10 +15,12 @@ import { SubscriptionRequestDto } from 'src/dtos/billing-plan/subscription-reque
 import { SubscriptionResponse } from 'src/dtos/billing-plan/subscription-response.dto';
 import { SubscriptionsFilter } from 'src/dtos/billing-plan/subscriptions-filter.dto';
 import { AuthUser } from 'src/extensions/auth.extensions';
+import { JwtAuthGuard } from 'src/providers/jwt-auth..guard';
 import { SubscriptionService } from 'src/services/subscription.service';
 
 @Controller('api/subscriptions')
 @ApiTags('Subscriptions')
+@UseGuards(JwtAuthGuard)
 export class SubscriptionsController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
@@ -33,6 +44,18 @@ export class SubscriptionsController {
     response.status(res.code).send(res);
   }
 
+  @Get('active')
+  @ApiResponse({ type: SubscriptionResponse })
+  async getActiveSubscription(
+    @AuthUser() user: UserJwtDetails,
+    @Res() response: Response,
+  ) {
+    const res = await this.subscriptionService.getUserActiveSubscription(
+      user.id,
+    );
+    response.status(res.code).send(res);
+  }
+
   @Get(':subscriptionId')
   @ApiParam({ name: 'subscriptionId', type: String })
   @ApiResponse({ type: SubscriptionResponse })
@@ -43,18 +66,6 @@ export class SubscriptionsController {
   ) {
     const res =
       await this.subscriptionService.getSubscriptionById(subscriptionId);
-    response.status(res.code).send(res);
-  }
-
-  @Get('active')
-  @ApiResponse({ type: SubscriptionResponse })
-  async getActiveSubscription(
-    @AuthUser() user: UserJwtDetails,
-    @Res() response: Response,
-  ) {
-    const res = await this.subscriptionService.getUserActiveSubscription(
-      user.id,
-    );
     response.status(res.code).send(res);
   }
 }

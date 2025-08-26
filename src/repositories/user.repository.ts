@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { dispatch } from 'nact';
+import { InvoiceActor } from 'src/actors/invoice.actor';
 import { GoogleAuthRequestDto } from 'src/dtos/auth/google.auth.request.dto';
-import { UserStatus } from 'src/enums';
+import { BillingFrequency, SubscriptionStatus, UserStatus } from 'src/enums';
 import { User } from 'src/schemas/user.schema';
 import { generateId } from 'src/utils';
 
@@ -11,6 +13,7 @@ export class UserRepository {
   private readonly logger = new Logger(UserRepository.name);
   constructor(
     @InjectModel(User.name) private readonly userRepository: Model<User>,
+    private readonly invoiceActor: InvoiceActor,
   ) {}
 
   //update user fcm token
@@ -40,6 +43,7 @@ export class UserRepository {
         { new: true },
       )
       .lean();
+
     return doc;
   }
 
@@ -49,7 +53,10 @@ export class UserRepository {
       createdAt: new Date(),
       id: generateId(),
     });
-    const data = await this.getByIdAsync(res.id);
+    const data = res.toObject();
+    dispatch(this.invoiceActor.setupSubscriptionForNewUser, {
+      user: data,
+    });
     return data;
   }
 
@@ -88,6 +95,10 @@ export class UserRepository {
           { new: true },
         )
         .lean();
+
+      dispatch(this.invoiceActor.setupSubscriptionForNewUser, {
+        user: doc,
+      });
       return doc;
     }
     const res = await this.userRepository.create({
@@ -103,7 +114,14 @@ export class UserRepository {
       tokenId: generateId(),
       authenticated: true,
     });
-    const data = await this.getByIdAsync(res.id);
-    return data;
+
+    const userInfo = res.toObject();
+
+    // Setup subscription for new user
+    dispatch(this.invoiceActor.setupSubscriptionForNewUser, {
+      user: userInfo,
+    });
+
+    return userInfo;
   }
 }

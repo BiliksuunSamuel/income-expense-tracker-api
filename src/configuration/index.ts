@@ -18,4 +18,9 @@ export default () => ({
   firebaseProjectId: process.env.FirebaseProjectId,
   firebasePrivateKey: process.env.FirebasePrivateKey?.replace(/\\n/g, '\n'),
   firebaseClientEmail: process.env.FirebaseClientEmail,
+  paystackConfig: {
+    url: process.env.PaystackBaseUrl,
+    secretKey: process.env.PaystackSecretKey,
+  },
+  baseUrl: process.env.ApiBaseUrl,
 });

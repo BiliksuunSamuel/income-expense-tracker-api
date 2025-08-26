@@ -4,9 +4,10 @@ import { Model } from 'mongoose';
 import { ApiResponseDto } from 'src/common/api.response.dto';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { BillingPlanRequestDto } from 'src/dtos/billing-plan/billing-plan-request.dto';
+import { BillingPlanType } from 'src/enums';
 import { CommonResponses } from 'src/helper/common.responses.helper';
 import { BillingPlan } from 'src/schemas/billing.plan.schema';
-import { generateId } from 'src/utils';
+import { calculateYearlyPrice, generateId } from 'src/utils';
 
 @Injectable()
 export class BillingPlanService {
@@ -30,7 +31,7 @@ export class BillingPlanService {
       });
       this.logger.log('New billing plan created', doc.toObject());
       return CommonResponses.CreatedResponse(
-        doc.toObject(),
+        calculateYearlyPrice(doc.toObject()),
         'Billing plan created successfully',
       );
     } catch (error) {
@@ -64,7 +65,7 @@ export class BillingPlanService {
       }
       this.logger.log('Billing plan updated successfully', doc);
       return CommonResponses.OkResponse(
-        doc,
+        calculateYearlyPrice(doc),
         'Billing plan updated successfully',
       );
     } catch (error) {
@@ -81,10 +82,12 @@ export class BillingPlanService {
   //get all billing plans
   async getBillingPlans(): Promise<ApiResponseDto<BillingPlan[]>> {
     try {
-      const plans = await this.billingPlanModel.find().lean();
+      const plans = await this.billingPlanModel
+        .find({ title: { $ne: BillingPlanType.Regular } })
+        .lean();
       this.logger.log(`Retrieved ${plans.length} billing plans`);
       return CommonResponses.OkResponse(
-        plans,
+        plans.map(calculateYearlyPrice),
         'Billing plans retrieved successfully',
       );
     } catch (error) {
@@ -99,14 +102,14 @@ export class BillingPlanService {
   // get billing plan by id
   async getBillingPlanById(id: string): Promise<ApiResponseDto<BillingPlan>> {
     try {
-      const plan = await this.billingPlanModel.findById(id).lean();
+      const plan = await this.billingPlanModel.findOne({ id }).lean();
       if (!plan) {
         this.logger.warn(`Billing plan with id ${id} not found`);
         return CommonResponses.NotFoundResponse('Billing plan not found');
       }
       this.logger.log('Billing plan retrieved successfully', plan);
       return CommonResponses.OkResponse(
-        plan,
+        calculateYearlyPrice(plan),
         'Billing plan retrieved successfully',
       );
     } catch (error) {

@@ -1,7 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { BillingFrequency, SubscriptionStatus } from 'src/enums';
+import { BaseSchema } from 'src/schemas';
 import { BillingPlan } from 'src/schemas/billing.plan.schema';
 
-export class SubscriptionResponse {
+export class SubscriptionResponse extends BaseSchema {
   @ApiProperty()
   startDate: Date;
 
@@ -16,4 +18,13 @@ export class SubscriptionResponse {
 
   @ApiProperty()
   plan: BillingPlan;
+
+  @ApiProperty()
+  maxNumberOfTransactions: number;
+
+  @ApiProperty()
+  status: SubscriptionStatus;
+
+  @ApiProperty()
+  billingFrequency: BillingFrequency;
 }

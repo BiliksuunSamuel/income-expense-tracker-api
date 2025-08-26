@@ -1,4 +1,9 @@
-import { MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  RequestMethod,
+  Patch,
+} from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HttpModule } from '@nestjs/axios';
@@ -16,6 +21,7 @@ import { AuthMiddleware } from 'src/middleware/auth.middleware';
 import { loadSchemas } from 'src/functions/load.schemas';
 import loadActors from 'src/functions/load.actors';
 import { RolesGuard } from 'src/providers/roles.guard';
+import { SubscriptionMiddleware } from 'src/middleware/subscription.middleware';
 
 @Module({
   imports: [
@@ -51,12 +57,45 @@ import { RolesGuard } from 'src/providers/roles.guard';
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
+      .apply(SubscriptionMiddleware)
+      .exclude(
+        // auth endpoints
+        { path: 'api/authentication/login', method: RequestMethod.POST },
+        { path: 'api/authentication/otp-verify', method: RequestMethod.PATCH },
+        { path: 'api/authentication/otp-resend', method: RequestMethod.POST },
+        { path: 'api/authentication/google-auth', method: RequestMethod.POST },
+        { path: 'api/authentication/logout', method: RequestMethod.POST },
+        { path: 'api/authentication/profile', method: RequestMethod.GET },
+
+        //billing plans
+        { path: 'api/billing-plans', method: RequestMethod.GET }, // get all plans
+        { path: 'api/billing-plans', method: RequestMethod.POST }, // add plan
+        { path: 'api/billing-plans/(.*)', method: RequestMethod.GET }, // get plan by id
+        { path: 'api/billing-plans/(.*)', method: RequestMethod.PATCH }, // update plan by id
+
+        // subscriptions
+        { path: 'api/subscriptions', method: RequestMethod.POST }, // create
+        { path: 'api/subscriptions/(.*)', method: RequestMethod.GET }, // any GET under /subscriptions/*
+
+        // invoices
+        { path: 'api/invoices/pay/(.*)', method: RequestMethod.POST }, // /pay/:id
+        { path: 'api/invoices/update-status', method: RequestMethod.GET },
+        { path: 'api/invoices/client', method: RequestMethod.GET },
+        { path: 'api/invoices/(.*)', method: RequestMethod.GET }, // /:invoiceId and any other GET under invoices
+      )
+      .forRoutes({
+        path: '*',
+        method: RequestMethod.ALL,
+      });
+
+    consumer
       .apply(AuthMiddleware)
       .exclude(
         { path: 'api/authentication/login', method: RequestMethod.POST },
         { path: 'api/authentication/otp-verify', method: RequestMethod.PATCH },
         { path: 'api/authentication/otp-resend', method: RequestMethod.POST },
         { path: 'api/authentication/logout', method: RequestMethod.POST },
+        { path: 'api/authentication/google-auth', method: RequestMethod.POST },
       )
       .forRoutes({
         path: '*',

@@ -31,4 +31,9 @@ export class BillingPlanRequestDto {
 
   @ApiProperty({ type: [String] })
   unavailableFeatures: string[];
+
+  @ApiProperty({ default: 0 })
+  @Min(-1)
+  @IsNotEmpty()
+  maxNumberOfTransactions: number;
 }

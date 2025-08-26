@@ -1,7 +1,7 @@
 import { Prop, Schema } from '@nestjs/mongoose';
 import { BaseSchema } from '.';
 import { ApiProperty } from '@nestjs/swagger';
-import { BillingFrequency } from 'src/enums';
+import { BillingFrequency, SubscriptionStatus } from 'src/enums';
 
 @Schema()
 export class Subscription extends BaseSchema {
@@ -35,5 +35,18 @@ export class Subscription extends BaseSchema {
     enum: BillingFrequency,
   })
   @ApiProperty({ enum: BillingFrequency })
+  @Prop({
+    enum: BillingFrequency,
+    type: String,
+    default: BillingFrequency.Monthly,
+  })
   billingFrequency: BillingFrequency;
+
+  @Prop({ default: 0, type: Number })
+  @ApiProperty()
+  maxNumberOfTransactions: number;
+
+  @Prop({ type: String, default: SubscriptionStatus.Pending })
+  @ApiProperty()
+  status: SubscriptionStatus;
 }

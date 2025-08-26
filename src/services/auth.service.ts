@@ -29,6 +29,9 @@ import { GoogleAuthUserInfo } from 'src/dtos/auth/google.auth.user.info.dto';
 import { ResetPasswordRequestDto } from 'src/dtos/auth/reset.password.request.dto';
 import { CommonResponses } from 'src/helper/common.responses.helper';
 import { CurrencyRequest } from 'src/dtos/user/currency.request.dto';
+import { SubscriptionService } from './subscription.service';
+import { Request } from 'express';
+import { InvoiceActor } from 'src/actors/invoice.actor';
 
 @Injectable()
 export class AuthService {
@@ -39,7 +42,41 @@ export class AuthService {
     private readonly userRepo: UserRepository,
     private readonly notificationActor: NotificationsActor,
     private readonly proxyHttpService: ProxyHttpService,
+    private readonly subscriptionService: SubscriptionService,
+    private readonly invoiceActor: InvoiceActor,
   ) {}
+
+  async getAuthDetails(req: Request): Promise<UserJwtDetails | null> {
+    try {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (
+        token &&
+        token !== 'null' &&
+        token !== 'undefined' &&
+        token !== 'Bearer null' &&
+        token !== 'Bearer undefined'
+      ) {
+        try {
+          const decondedToken =
+            await this.jwtService.verifyAsync<UserJwtDetails>(token);
+          if (decondedToken) {
+            const user = await this.userRepository
+              .findOne({ id: decondedToken.id })
+              .lean();
+            decondedToken.user = user;
+          }
+          return decondedToken;
+        } catch (error) {
+          this.logger.error('Error in GetAuthDetails Middleware', error);
+          return null;
+        }
+      }
+      return null;
+    } catch (error) {
+      this.logger.error('an error occurred getting auth details', error);
+      return null;
+    }
+  }
 
   //handle update user fcm token
   async updateUserFcmTokenAsync(
@@ -81,6 +118,8 @@ export class AuthService {
       if (!user) {
         return CommonResponses.NotFoundResponse<AuthResponse>();
       }
+      const subscription =
+        await this.subscriptionService.getUserActiveSubscription(auth.id);
       return CommonResponses.OkResponse<AuthResponse>(
         {
           user: toUserReponse(user),
@@ -90,6 +129,7 @@ export class AuthService {
             phoneNumber: user.phoneNumber,
             tokenId: user.tokenId,
           }),
+          subscription: subscription.data,
         },
         'User profile retrieved successfully',
       );
@@ -263,12 +303,22 @@ export class AuthService {
     request: GoogleAuthUserRequestDto,
   ): Promise<ApiResponseDto<AuthResponse>> {
     try {
+      const decodedGoogleAuthTokeInfo = await this.jwtService.decode(
+        request.accessToken,
+      );
+
+      this.logger.debug(
+        'Decoded Google Auth Token Info',
+        decodedGoogleAuthTokeInfo,
+      );
+
       const googleUserInfo =
         await this.proxyHttpService.request<GoogleAuthUserInfo>({
           method: 'get',
           url: configuration().googleAuthUrl,
           token: request.accessToken,
         });
+
       if (!googleUserInfo) {
         return {
           message: 'An error occurred while authenticating account',
@@ -291,6 +341,12 @@ export class AuthService {
           code: HttpStatus.FAILED_DEPENDENCY,
         };
       }
+      //delay for 1 second to allow user subscription to be set up
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      //get user active subscription
+      const subscription =
+        await this.subscriptionService.getUserActiveSubscription(user.id);
       const response: AuthResponse = {
         user: toUserReponse(user),
         token: await this.generateToken({
@@ -299,6 +355,7 @@ export class AuthService {
           phoneNumber: user.phoneNumber,
           tokenId: user.tokenId,
         }),
+        subscription: subscription.data,
       };
       return {
         message: 'Account verification successful',
@@ -424,12 +481,22 @@ export class AuthService {
       user.fcmToken = request.fcmToken;
       const { _id, ...others } = user as any;
       const res = await this.userRepo.updateAsync(user.email, { ...others });
+      dispatch(this.invoiceActor.setupSubscriptionForNewUser, {
+        user: res,
+      });
+
       if (!res) {
         return {
           message: 'An error occurred while authenticating account',
           code: HttpStatus.FAILED_DEPENDENCY,
         };
       }
+
+      //delay for 1 second to allow user subscription to be set up
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const subscription =
+        await this.subscriptionService.getUserActiveSubscription(user.id);
       const response: AuthResponse = {
         user: toUserReponse(user),
         token: await this.generateToken({
@@ -438,6 +505,7 @@ export class AuthService {
           phoneNumber: user.phoneNumber,
           tokenId: user.tokenId,
         }),
+        subscription: subscription.data,
       };
       return {
         message: 'Account verification successful',

@@ -34,4 +34,11 @@ export class BillingPlan extends BaseSchema {
   @Prop({ default: [] })
   @ApiProperty({ type: [String] })
   unavailableFeatures: string[];
+
+  @ApiProperty()
+  yearlyPrice: number;
+
+  @Prop({ default: 0, type: Number })
+  @ApiProperty()
+  maxNumberOfTransactions: number;
 }

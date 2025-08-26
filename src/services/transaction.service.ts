@@ -14,6 +14,11 @@ import { ImageService } from 'src/services/image.service';
 import { TransactionRepository } from 'src/repositories/transaction.repository';
 import { Transaction } from 'src/schemas/transaction.schema';
 import { convertFileExtensionToBase64FileType, generateId } from 'src/utils';
+import { SubscriptionRepository } from 'src/repositories/subscription.repository';
+import { FileContentResponse } from 'src/dtos/common/file-content-response';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { ExportTransactionToExcel } from 'src/utils/export-utlity';
 
 @Injectable()
 export class TransactionService {
@@ -23,6 +28,9 @@ export class TransactionService {
     private readonly imageService: ImageService,
     private readonly budgetActor: BudgetActor,
     private readonly categoryActor: CategoryActor,
+    private readonly subscriptionRepository: SubscriptionRepository,
+    @InjectModel(Transaction.name)
+    private readonly transactionModel: Model<Transaction>,
   ) {}
 
   //get transactions for export to pdf
@@ -361,6 +369,11 @@ export class TransactionService {
   ): Promise<ApiResponseDto<boolean>> {
     try {
       this.logger.debug('received request to creat transaction\n', user);
+
+      var subscriptionInfo =
+        await this.subscriptionRepository.getUserActiveSubscriptionWithInvoiceAsync(
+          user.id,
+        );
       const transaction: Transaction = {
         ...request,
         username: user.email,
@@ -372,6 +385,8 @@ export class TransactionService {
         year: new Date().getFullYear(),
         updatedAt: null,
         updatedBy: null,
+        invoiceId: subscriptionInfo?.invoice?.id || null,
+        subscriptionId: subscriptionInfo?.subscription?.id || null,
       };
 
       if (request.invoice) {
@@ -402,6 +417,55 @@ export class TransactionService {
       );
       return CommonResponses.InternalServerErrorResponse(
         'An error occurred while creating transaction',
+      );
+    }
+  }
+
+  //Export transaction to excel
+  async exportTransactionToFile(
+    filter: TransactionFilter,
+    userId: string,
+  ): Promise<ApiResponseDto<FileContentResponse>> {
+    try {
+      const query: any = {};
+      if (userId) {
+        query.userId = userId;
+      }
+      if (filter.category) {
+        query.category = filter.category;
+      }
+      if (filter.startDate) {
+        query.createdAt = {
+          $gte: new Date(filter.startDate),
+        };
+      }
+      if (filter.endDate) {
+        query.createdAt = {
+          ...query.createdAt,
+          $lte: new Date(filter.endDate),
+        };
+      }
+      if (filter.budgetId) {
+        query.budgetId = filter.budgetId;
+      }
+      if (filter.type) {
+        query.type = filter.type;
+      }
+      if (filter.period) {
+        query.period = filter.period;
+      }
+
+      const transactions = await this.transactionModel.find(query).lean();
+      const res = await ExportTransactionToExcel(transactions);
+      return CommonResponses.OkResponse(res);
+    } catch (error) {
+      this.logger.error(
+        'an error occurred while exporting transaction to excel\n',
+        filter,
+        error,
+      );
+      return CommonResponses.InternalServerErrorResponse<FileContentResponse>(
+        'An error occurred while exporting transaction to excel',
       );
     }
   }

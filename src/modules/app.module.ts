@@ -66,6 +66,7 @@ export class AppModule {
         { path: 'api/authentication/google-auth', method: RequestMethod.POST },
         { path: 'api/authentication/logout', method: RequestMethod.POST },
         { path: 'api/authentication/profile', method: RequestMethod.GET },
+        { path: 'api/authentication/register', method: RequestMethod.POST },
 
         //billing plans
         { path: 'api/billing-plans', method: RequestMethod.GET }, // get all plans
@@ -96,6 +97,7 @@ export class AppModule {
         { path: 'api/authentication/otp-resend', method: RequestMethod.POST },
         { path: 'api/authentication/logout', method: RequestMethod.POST },
         { path: 'api/authentication/google-auth', method: RequestMethod.POST },
+        { path: 'api/authentication/register', method: RequestMethod.POST },
       )
       .forRoutes({
         path: '*',

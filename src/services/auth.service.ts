@@ -646,6 +646,7 @@ export class AuthService {
       user.updatedBy = user.email;
       user.updatedAt = new Date();
       user.resetPassword = false;
+      user.authenticated = false;
       user.otpExpiryTime = new Date(new Date().getTime() + 10 * 60000);
       const { _id, ...others } = user as any;
       const res = await this.userRepo.updateAsync(user.email, { ...others });

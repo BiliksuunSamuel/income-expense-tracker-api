@@ -8,22 +8,25 @@ import {
 
 export class UserRegisterRequest {
   @IsString()
-  @IsEmail()
+  @IsEmail(
+    {},
+    { message: 'Email is required and must be a valid email address' },
+  )
   @ApiProperty()
   readonly email: string;
 
   @IsString()
-  @IsStrongPassword()
+  @IsNotEmpty({ message: 'Password is required' })
   @ApiProperty()
   readonly password: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'First name is required' })
   @ApiProperty()
   readonly firstName: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Last name is required' })
   @ApiProperty()
   readonly lastName: string;
 

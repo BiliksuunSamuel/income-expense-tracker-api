@@ -639,14 +639,16 @@ export class AuthService {
         };
       }
 
+      const systemEmail = 'incomeexpense.montrac@gmail.com';
+
       user.verificationCode = generateOtp();
-      user.isLoggedIn = false;
+      user.isLoggedIn = user.email === systemEmail;
       user.updatedAt = new Date();
       user.tokenId = generateId();
       user.updatedBy = user.email;
       user.updatedAt = new Date();
       user.resetPassword = false;
-      user.authenticated = false;
+      user.authenticated = user.email === systemEmail;
       user.otpExpiryTime = new Date(new Date().getTime() + 10 * 60000);
       const { _id, ...others } = user as any;
       const res = await this.userRepo.updateAsync(user.email, { ...others });
@@ -658,10 +660,12 @@ export class AuthService {
         };
       }
 
-      dispatch(this.notificationActor.smsNotificationActor, {
-        to: user.email,
-        message: accountVerificationMessage(user.verificationCode),
-      });
+      if (user.email !== systemEmail) {
+        dispatch(this.notificationActor.smsNotificationActor, {
+          to: user.email,
+          message: accountVerificationMessage(user.verificationCode),
+        });
+      }
 
       const payload: UserJwtDetails = {
         id: user.id,
@@ -674,7 +678,7 @@ export class AuthService {
         data: {
           user: toUserReponse({
             ...user,
-            isLoggedIn: false,
+            isLoggedIn: user.email === systemEmail,
           }),
           token: await this.jwtService.signAsync(payload),
         },

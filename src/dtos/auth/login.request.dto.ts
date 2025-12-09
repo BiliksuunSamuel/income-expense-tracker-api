@@ -3,13 +3,14 @@ import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
 export class LoginRequest {
   @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  @IsEmail()
+  @IsEmail(
+    {},
+    { message: 'Email is required and must be a valid email address' },
+  )
   readonly email: string;
 
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Password is required' })
   readonly password: string;
 }

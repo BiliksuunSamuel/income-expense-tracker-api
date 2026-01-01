@@ -41,6 +41,10 @@ export class ReportsRepository {
       };
     }
 
+    if (filter.category) {
+      expenseMatch.category = filter.category;
+    }
+
     const expenseReport = await this.transactionsRepository.aggregate([
       {
         $match: expenseMatch,
@@ -62,6 +66,10 @@ export class ReportsRepository {
         $gte: startDate,
         $lte: endDate,
       };
+    }
+
+    if (filter.category) {
+      incomeMatch.category = filter.category;
     }
 
     //get report from transactions of type=Income grouped by category

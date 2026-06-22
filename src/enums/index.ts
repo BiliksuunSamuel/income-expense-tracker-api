@@ -38,6 +38,11 @@ export enum BudgetStatus {
   Closed = 'Closed',
 }
 
+export enum RecurringTransactionStatus {
+  Active = 'Active',
+  Closed = 'Closed',
+}
+
 export enum BillingPlanType {
   Regular = 'Regular',
   Premium = 'Premium',

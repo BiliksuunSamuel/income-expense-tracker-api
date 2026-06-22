@@ -19,6 +19,7 @@ import { FileContentResponse } from 'src/dtos/common/file-content-response';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ExportTransactionToExcel } from 'src/utils/export-utlity';
+import { RecurringTransactionService } from 'src/services/recurring.transaction.service';
 
 @Injectable()
 export class TransactionService {
@@ -29,6 +30,7 @@ export class TransactionService {
     private readonly budgetActor: BudgetActor,
     private readonly categoryActor: CategoryActor,
     private readonly subscriptionRepository: SubscriptionRepository,
+    private readonly recurringTransactionService: RecurringTransactionService,
     @InjectModel(Transaction.name)
     private readonly transactionModel: Model<Transaction>,
   ) {}
@@ -399,6 +401,14 @@ export class TransactionService {
 
       if (transaction.budgetId) {
         dispatch(this.budgetActor.updateBudgetDetails, transaction);
+      }
+
+      // If this transaction repeats, schedule a recurring template so the
+      // background job mints future occurrences.
+      if (request.repeatTransaction) {
+        await this.recurringTransactionService.createFromTransaction(
+          transaction,
+        );
       }
 
       //produce event to add category for user if it doesnt exist

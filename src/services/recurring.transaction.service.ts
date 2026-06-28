@@ -2,13 +2,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { dispatch } from 'nact';
 import { BudgetActor } from 'src/actors/budget.actor';
+import { NotificationsActor } from 'src/actors/notification.actor';
 import { ApiResponseDto } from 'src/common/api.response.dto';
+import { EmailRequest } from 'src/dtos/notification/email.request.dto';
+import { FcmNotificationRequest } from 'src/dtos/notification/fcm.notification.request.dto';
 import { RecurringTransactionResponse } from 'src/dtos/recurring-transaction/recurring.transaction.response.dto';
 import { RecurringTransactionUpdate } from 'src/dtos/recurring-transaction/recurring.transaction.update.dto';
-import { RecurringTransactionStatus, TransactionRepeatFrequency } from 'src/enums';
+import {
+  RecurringTransactionStatus,
+  TransactionRepeatFrequency,
+  TransactionType,
+} from 'src/enums';
 import { CommonResponses } from 'src/helper/common.responses.helper';
 import { RecurringTransactionRepository } from 'src/repositories/recurring.transaction.repository';
 import { TransactionRepository } from 'src/repositories/transaction.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 import { RecurringTransaction } from 'src/schemas/recurring.transaction.schema';
 import { Transaction } from 'src/schemas/transaction.schema';
 import { generateId } from 'src/utils';
@@ -21,6 +29,8 @@ export class RecurringTransactionService {
     private readonly repository: RecurringTransactionRepository,
     private readonly transactionRepository: TransactionRepository,
     private readonly budgetActor: BudgetActor,
+    private readonly notificationActor: NotificationsActor,
+    private readonly userRepository: UserRepository,
   ) {}
 
   /// Called right after a transaction with `repeatTransaction = true` is saved.
@@ -243,6 +253,64 @@ export class RecurringTransactionService {
     await this.transactionRepository.createTransaction(transaction);
     if (transaction.budgetId) {
       dispatch(this.budgetActor.updateBudgetDetails, transaction);
+    }
+    await this.notifyUser(r, transaction);
+  }
+
+  /// Notifies the user that a recurring transaction was processed and a
+  /// transaction was created on their behalf — via push (FCM) and email.
+  /// The two channels are independent: a user with only an email still gets
+  /// notified, and vice versa.
+  private async notifyUser(
+    r: RecurringTransaction,
+    transaction: Transaction,
+  ): Promise<void> {
+    try {
+      const user = await this.userRepository.getByIdAsync(r.userId);
+      if (!user) {
+        return;
+      }
+
+      const amount = `${transaction.currency ?? ''}${transaction.amount.toFixed(2)}`;
+      const verb =
+        transaction.type === TransactionType.Income ? 'added' : 'recorded';
+      const title = 'Recurring Transaction Processed';
+      const message = `Your recurring ${transaction.type.toLowerCase()} of ${amount} for ${transaction.category} has been ${verb} automatically.`;
+
+      //push notification
+      if (user.fcmToken?.length > 0) {
+        const fcmRequest: FcmNotificationRequest = {
+          token: user.fcmToken,
+          notification: {
+            title,
+            body: `🔁 ${message}`,
+          },
+          data: {
+            type: 'recurring_transaction',
+            transactionId: transaction.id,
+            recurringTransactionId: r.id,
+          },
+        };
+        dispatch(this.notificationActor.sendFcmNotication, fcmRequest);
+      }
+
+      //email notification
+      if (user.email?.length > 0) {
+        const greeting = user.firstName ? `Hi ${user.firstName},` : 'Hi,';
+        const emailRequest: EmailRequest = {
+          to: user.email,
+          subject: title,
+          text: `${greeting} ${message}`,
+          html: `<p>${greeting}</p><p>🔁 ${message}</p><p>You can review it anytime in your transactions.</p>`,
+        };
+        dispatch(this.notificationActor.emailNotificationActor, emailRequest);
+      }
+    } catch (error) {
+      this.logger.error(
+        'failed to send recurring transaction notification',
+        error,
+        r.id,
+      );
     }
   }
 

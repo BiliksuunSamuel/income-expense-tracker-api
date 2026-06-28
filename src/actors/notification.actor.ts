@@ -6,6 +6,7 @@ import { ProxyHttpService } from 'src/services/proxy-http.service';
 import { FirebaseService } from 'src/services/firebase.service';
 import { SendSmsRequest } from 'src/common';
 import { MailService } from 'src/services/mail.service';
+import { EmailRequest } from 'src/dtos/notification/email.request.dto';
 
 @Injectable()
 export class NotificationsActor extends BaseActor {
@@ -40,6 +41,24 @@ export class NotificationsActor extends BaseActor {
       }
     },
   );
+  //handle sending a generic email notification
+  emailNotificationActor = spawnStateless(
+    this.system,
+    async (msg: EmailRequest, ctx) => {
+      try {
+        this.logger.debug('received message to send email notification', msg);
+        await this.mailService.sendEmail(msg);
+      } catch (error) {
+        this.logger.error(
+          'an error occurred while sending email notification',
+          msg,
+          ctx.name,
+          error,
+        );
+      }
+    },
+  );
+
   //handle sending sms notification
   smsNotificationActor = spawnStateless(
     this.system,

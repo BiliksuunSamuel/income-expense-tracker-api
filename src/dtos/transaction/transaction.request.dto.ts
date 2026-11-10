@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -71,6 +72,12 @@ export class TransactionRequest {
 
   @ApiProperty({ default: null })
   invoice: any;
+
+  /** Takes the receipt off (when editing). */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  removeInvoice?: boolean;
 
   @ApiProperty({ default: null })
   budgetId: string;

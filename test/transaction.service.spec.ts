@@ -7,7 +7,11 @@ import { TransactionType } from 'src/enums';
 
 const user = { id: 'u1', email: 'ama@example.com' } as UserJwtDetails;
 
-function setup(owner: string | null = null) {
+function setup(
+  owner: string | null = null,
+  upload: unknown = { secure_url: 'https://res.example.com/r.jpg' },
+) {
+  const images = { cloudinaryUpload: jest.fn().mockResolvedValue(upload) };
   const repo = {
     getTransactionOwner: jest.fn().mockResolvedValue(owner),
     createTransaction: jest.fn().mockResolvedValue(true),
@@ -26,7 +30,7 @@ function setup(owner: string | null = null) {
   };
   const service = new TransactionService(
     repo as any,
-    {} as any,
+    images as any,
     {} as any,
     {} as any,
     subscriptions as any,
@@ -34,7 +38,7 @@ function setup(owner: string | null = null) {
     accounts as any,
     {} as any,
   );
-  return { service, repo };
+  return { service, repo, images };
 }
 
 const request = (extra: Partial<TransactionRequest> = {}) =>
@@ -143,5 +147,59 @@ describe('the account of a transaction', () => {
     await service.createTransaction(request({ account: 'Default' } as any), user);
     expect(repo.createTransaction.mock.calls[0][0].account).toBe('momo');
     expect(repo.createTransaction.mock.calls[1][0].account).toBe('cash');
+  });
+});
+
+describe('receipts', () => {
+  const withReceipt = (extra: Partial<TransactionRequest> = {}) =>
+    request({
+      id: 'abc12345-0009',
+      invoice: 'aGVsbG8=',
+      invoiceFileName: 'receipt.jpg',
+      invoiceFileType: 'jpg',
+      ...extra,
+    });
+
+  it('saves the uploaded receipt with its name and type', async () => {
+    const { service, repo } = setup();
+    await service.createTransaction(withReceipt(), user);
+    const saved = repo.createTransaction.mock.calls[0][0];
+    expect(saved).toMatchObject({
+      invoiceUrl: 'https://res.example.com/r.jpg',
+      invoiceFileName: 'receipt.jpg',
+      invoiceFileType: 'jpg',
+    });
+    expect(saved.invoice).toBeUndefined();
+  });
+
+  it('a failed upload saves nothing, so the app tries again', async () => {
+    const { service, repo } = setup(null, null);
+    const res = await service.createTransaction(withReceipt(), user);
+    expect(res.code).toBe(502);
+    expect(repo.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('editing keeps the file type right and can take the receipt off', async () => {
+    const { service, repo } = setup();
+    repo.getTransactionById.mockResolvedValue({
+      id: 't1',
+      userId: 'u1',
+      invoiceUrl: 'https://old',
+      invoiceFileName: 'old.jpg',
+      invoiceFileType: 'jpg',
+    });
+    repo.updateTransaction.mockResolvedValue(true);
+    await service.updateTransaction('t1', withReceipt({ invoiceFileType: 'png' }), user);
+    expect(repo.updateTransaction.mock.calls[0][2].invoiceFileType).toBe('png');
+    await service.updateTransaction('t1', request({ removeInvoice: true }), user);
+    expect(repo.updateTransaction.mock.calls[1][2].invoiceUrl).toBeNull();
+  });
+
+  it('a failed upload while editing changes nothing', async () => {
+    const { service, repo } = setup(null, null);
+    repo.getTransactionById.mockResolvedValue({ id: 't1', userId: 'u1' });
+    const res = await service.updateTransaction('t1', withReceipt(), user);
+    expect(res.code).toBe(502);
+    expect(repo.updateTransaction).not.toHaveBeenCalled();
   });
 });

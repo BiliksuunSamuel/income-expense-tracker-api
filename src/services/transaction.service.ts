@@ -1,4 +1,6 @@
 import { CategoryKind } from 'src/enums';
+import { exportTransactionsToCsv } from 'src/utils/export-csv';
+import { transactionQuery } from 'src/utils/transaction-query';
 import { Injectable, Logger } from '@nestjs/common';
 import { dispatch } from 'nact';
 import { BudgetActor } from 'src/actors/budget.actor';
@@ -339,12 +341,16 @@ export class TransactionService {
         budgetId: request.budgetId,
       };
 
+      if (request.removeInvoice) {
+        updatedDoc.invoiceUrl = null;
+        updatedDoc.invoiceFileName = null;
+        updatedDoc.invoiceFileType = null;
+      }
       if (request.invoice) {
-        const base64String = `data:${convertFileExtensionToBase64FileType(request.invoiceFileType)};base64,${request.invoice}`;
-        const invoice = await this.imageService.cloudinaryUpload(base64String);
-        updatedDoc.invoiceUrl = invoice?.secure_url;
-        updatedDoc.invoiceFileName = request.invoiceFileName;
-        updatedDoc.invoiceFileType = request.invoiceFileName;
+        const receipt = await this.uploadReceipt(request);
+        // Not saved without it: the app's queue tries again later.
+        if (!receipt) return this.receiptFailed();
+        Object.assign(updatedDoc, receipt);
       }
 
       const res = await this.transactionRepository.updateTransaction(
@@ -446,10 +452,11 @@ export class TransactionService {
       };
 
       if (request.invoice) {
-        const base64String = `data:${convertFileExtensionToBase64FileType(request.invoiceFileType)};base64,${request.invoice}`;
-        const invoice = await this.imageService.cloudinaryUpload(base64String);
-        transaction.invoiceUrl = invoice?.secure_url;
+        const receipt = await this.uploadReceipt(request);
+        if (!receipt) return this.receiptFailed();
+        Object.assign(transaction, receipt);
       }
+      delete (transaction as Partial<TransactionRequest>).invoice;
 
       await this.transactionRepository.createTransaction(transaction);
 
@@ -487,51 +494,58 @@ export class TransactionService {
   }
 
   //Export transaction to excel
+  /** The user's transactions matching [filter] as an Excel or CSV file
+   * (`format=csv`), newest first. */
   async exportTransactionToFile(
-    filter: TransactionFilter,
+    filter: TransactionFilter & { format?: string },
     userId: string,
   ): Promise<ApiResponseDto<FileContentResponse>> {
     try {
-      const query: any = {};
-      if (userId) {
-        query.userId = userId;
-      }
-      if (filter.category) {
-        query.category = filter.category;
-      }
-      if (filter.startDate) {
-        query.createdAt = {
-          $gte: new Date(filter.startDate),
-        };
-      }
-      if (filter.endDate) {
-        query.createdAt = {
-          ...query.createdAt,
-          $lte: new Date(filter.endDate),
-        };
-      }
-      if (filter.budgetId) {
-        query.budgetId = filter.budgetId;
-      }
-      if (filter.type) {
-        query.type = filter.type;
-      }
-      if (filter.period) {
-        query.period = filter.period;
-      }
-
-      const transactions = await this.transactionModel.find(query).lean();
-      const res = await ExportTransactionToExcel(transactions);
+      const query = transactionQuery(filter, userId);
+      const [transactions, accounts] = await Promise.all([
+        this.transactionModel.find(query).sort({ createdAt: -1 }).lean(),
+        this.accountService.accountNames(userId),
+      ]);
+      const accountName = (id: string) =>
+        accounts.get(id) ?? (id === 'Default' ? '' : (id ?? ''));
+      const res =
+        String(filter.format).toLowerCase() === 'csv'
+          ? exportTransactionsToCsv(transactions, accountName)
+          : await ExportTransactionToExcel(transactions, accountName);
       return CommonResponses.OkResponse(res);
     } catch (error) {
-      this.logger.error(
-        'an error occurred while exporting transaction to excel\n',
-        filter,
-        error,
-      );
+      this.logger.error('could not export transactions', filter, error);
       return CommonResponses.InternalServerErrorResponse<FileContentResponse>(
-        'An error occurred while exporting transaction to excel',
+        'An error occurred while exporting your transactions',
       );
     }
+  }
+
+  /** Uploads the receipt in [request]; null when the upload failed. */
+  private async uploadReceipt(
+    request: Pick<
+      TransactionRequest,
+      'invoice' | 'invoiceFileName' | 'invoiceFileType'
+    >,
+  ): Promise<Pick<
+    Transaction,
+    'invoiceUrl' | 'invoiceFileName' | 'invoiceFileType'
+  > | null> {
+    const type = convertFileExtensionToBase64FileType(request.invoiceFileType);
+    const uploaded = await this.imageService.cloudinaryUpload(
+      `data:${type};base64,${request.invoice}`,
+    );
+    if (!uploaded?.secure_url) return null;
+    return {
+      invoiceUrl: uploaded.secure_url,
+      invoiceFileName: request.invoiceFileName ?? null,
+      invoiceFileType: request.invoiceFileType ?? null,
+    };
+  }
+
+  private receiptFailed<T>(): ApiResponseDto<T> {
+    return CommonResponses.BadGatewayResponse<T>(
+      "Couldn't save the receipt. Please try again.",
+    );
   }
 }

@@ -78,6 +78,10 @@ export class AppModule {
         { path: 'api/subscriptions', method: RequestMethod.POST }, // create
         { path: 'api/subscriptions/(.*)', method: RequestMethod.GET }, // any GET under /subscriptions/*
 
+        // your data: always open, whatever the plan
+        { path: 'api/me/data', method: RequestMethod.GET },
+        { path: 'api/me', method: RequestMethod.DELETE },
+
         // invoices
         { path: 'api/invoices/pay/(.*)', method: RequestMethod.POST }, // /pay/:id
         { path: 'api/invoices/update-status', method: RequestMethod.GET },

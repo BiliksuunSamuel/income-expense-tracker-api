@@ -88,7 +88,8 @@ export class AccountService {
   ): Promise<ApiResponseDto<Account>> {
     try {
       const account = await this.accountRepository.byId(id, user.id);
-      if (!account) return CommonResponses.NotFoundResponse('Account not found');
+      if (!account)
+        return CommonResponses.NotFoundResponse('Account not found');
       if (changes.archived && (changes.isDefault ?? account.isDefault)) {
         return CommonResponses.BadRequestResponse(
           null,
@@ -122,7 +123,8 @@ export class AccountService {
   ): Promise<ApiResponseDto<Account>> {
     try {
       const account = await this.accountRepository.byId(id, user.id);
-      if (!account) return CommonResponses.NotFoundResponse('Account not found');
+      if (!account)
+        return CommonResponses.NotFoundResponse('Account not found');
       if (account.isDefault) {
         return CommonResponses.BadRequestResponse(
           null,
@@ -142,6 +144,12 @@ export class AccountService {
         'An error occurred while deleting the account',
       );
     }
+  }
+
+  /** Account id → name, for exports. */
+  async accountNames(userId: string): Promise<Map<string, string>> {
+    const accounts = await this.accountRepository.list(userId);
+    return new Map(accounts.map((a) => [a.id, a.name]));
   }
 
   /** The account a transaction belongs to: [requested] if it is one of the

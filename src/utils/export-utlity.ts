@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs';
 // Export transaction to Excel
 export async function ExportTransactionToExcel(
   transactions: Transaction[],
+  accountName: (id: string) => string = (id) => id ?? '',
 ): Promise<FileContentResponse> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Transactions', {
@@ -18,8 +19,10 @@ export async function ExportTransactionToExcel(
     { header: 'Amount', key: 'amount', width: 14 },
     { header: 'Currency', key: 'currency', width: 10 },
     { header: 'Category', key: 'category', width: 16 },
-    { header: 'Type', key: 'Type', width: 14 },
+    { header: 'Type', key: 'type', width: 14 },
     { header: 'Description', key: 'description', width: 40 },
+    { header: 'Account', key: 'account', width: 18 },
+    { header: 'Receipt', key: 'receipt', width: 30 },
   ];
 
   // Header styling
@@ -57,6 +60,8 @@ export async function ExportTransactionToExcel(
       category: t.category ?? '',
       type: t.type ?? 'N/A',
       description: t.description ?? '',
+      account: accountName(t.account),
+      receipt: t.invoiceUrl ?? '',
     });
   });
 

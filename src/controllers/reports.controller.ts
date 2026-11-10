@@ -1,5 +1,6 @@
 import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { MonthlyCategoryTotal } from 'src/dtos/reports/monthly.totals.dto';
 import { ReportsService } from '../services/reports.service';
 import { Response } from 'express';
 import { JwtAuthGuard } from 'src/providers/jwt-auth..guard';
@@ -28,6 +29,24 @@ export class ReportsController {
     const res = await this.reportsService.getFinancialReportSummaryAsync(
       user.id,
       query,
+    );
+    response.status(res.code).send(res);
+  }
+
+  @Get('monthly-totals')
+  @ApiResponse({ type: [MonthlyCategoryTotal] })
+  @ApiQuery({ name: 'months', required: false })
+  @ApiQuery({ name: 'offset', required: false, description: 'e.g. +00:00' })
+  async getMonthlyTotals(
+    @Query('months') months: string,
+    @Query('offset') offset: string,
+    @Res() response: Response,
+    @AuthUser() user: UserJwtDetails,
+  ) {
+    const res = await this.reportsService.monthlyTotals(
+      user.id,
+      months,
+      offset,
     );
     response.status(res.code).send(res);
   }

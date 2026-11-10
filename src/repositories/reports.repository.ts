@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { FinancialReportFilter } from 'src/dtos/common/financial.report.filter';
 import { FinancialReportResponse } from 'src/dtos/common/financial.report.response';
+import { MonthlyCategoryTotal } from 'src/dtos/reports/monthly.totals.dto';
 import { Transaction } from 'src/schemas/transaction.schema';
 
 @Injectable()
@@ -41,7 +42,7 @@ export class ReportsRepository {
       };
     }
 
-    if (filter.category) {
+    if (typeof filter.category === 'string' && filter.category) {
       expenseMatch.category = filter.category;
     }
 
@@ -68,7 +69,7 @@ export class ReportsRepository {
       };
     }
 
-    if (filter.category) {
+    if (typeof filter.category === 'string' && filter.category) {
       incomeMatch.category = filter.category;
     }
 
@@ -106,5 +107,50 @@ export class ReportsRepository {
     };
 
     return response;
+  }
+
+  /** Totals per month, type and category from [from] on, months counted in
+   * the zone [offset]. */
+  async monthlyTotals(
+    userId: string,
+    from: Date,
+    offset: string,
+  ): Promise<MonthlyCategoryTotal[]> {
+    const rows = await this.transactionsRepository.aggregate<{
+      _id: {
+        month: string;
+        type: MonthlyCategoryTotal['type'];
+        category: string;
+      };
+      total: number;
+      count: number;
+    }>([
+      { $match: { userId, createdAt: { $gte: from } } },
+      {
+        $group: {
+          _id: {
+            month: {
+              $dateToString: {
+                format: '%Y-%m',
+                date: '$createdAt',
+                timezone: offset,
+              },
+            },
+            type: '$type',
+            category: '$category',
+          },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.month': 1 } },
+    ]);
+    return rows.map((r) => ({
+      month: r._id.month,
+      type: r._id.type,
+      category: r._id.category,
+      total: Math.round(r.total * 100) / 100,
+      count: r.count,
+    }));
   }
 }

@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -11,6 +12,7 @@ import { ApiParam, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { RecurringTransactionUpdate } from 'src/dtos/recurring-transaction/recurring.transaction.update.dto';
+import { RecurringPayment } from 'src/dtos/recurring-transaction/recurring.transaction.pay.dto';
 import { AuthUser } from 'src/extensions/auth.extensions';
 import { JwtAuthGuard } from 'src/providers/jwt-auth..guard';
 import { RecurringTransactionService } from 'src/services/recurring.transaction.service';
@@ -36,6 +38,23 @@ export class RecurringTransactionsController {
     response.status(res.code).send(res);
   }
 
+  /** Records the next occurrence now (paid early, or confirmed). */
+  @Post(':id/pay')
+  @ApiParam({ name: 'id', type: String })
+  async payOccurrence(
+    @Param('id') id: string,
+    @Body() body: RecurringPayment,
+    @Res() response: Response,
+    @AuthUser() user: UserJwtDetails,
+  ) {
+    const res = await this.recurringTransactionService.payOccurrence(
+      id,
+      user.id,
+      body,
+    );
+    response.status(res.code).send(res);
+  }
+
   //update editable fields (amount, description)
   @Patch(':id')
   @ApiParam({ name: 'id', type: String })
@@ -45,11 +64,12 @@ export class RecurringTransactionsController {
     @Res() response: Response,
     @AuthUser() user: UserJwtDetails,
   ) {
-    const res = await this.recurringTransactionService.updateRecurringTransaction(
-      id,
-      user.id,
-      body,
-    );
+    const res =
+      await this.recurringTransactionService.updateRecurringTransaction(
+        id,
+        user.id,
+        body,
+      );
     response.status(res.code).send(res);
   }
 

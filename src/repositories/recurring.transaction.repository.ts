@@ -11,9 +11,7 @@ export class RecurringTransactionRepository {
     private readonly model: Model<RecurringTransaction>,
   ) {}
 
-  async create(
-    recurring: RecurringTransaction,
-  ): Promise<RecurringTransaction> {
+  async create(recurring: RecurringTransaction): Promise<RecurringTransaction> {
     const created = await this.model.create(recurring);
     return created.toObject();
   }
@@ -52,5 +50,22 @@ export class RecurringTransactionRepository {
     patch: Partial<RecurringTransaction>,
   ): Promise<RecurringTransaction> {
     return this.model.findOneAndUpdate({ id }, patch, { new: true }).lean();
+  }
+
+  /** Moves [id] past the occurrence at [dueAt] if that is still the next
+   * one; returns null when someone else (the scheduler, an earlier try) got
+   * there first. */
+  async claimOccurrence(
+    id: string,
+    dueAt: Date,
+    patch: Partial<RecurringTransaction>,
+  ): Promise<RecurringTransaction | null> {
+    return this.model
+      .findOneAndUpdate(
+        { id, nextRunAt: dueAt, status: RecurringTransactionStatus.Active },
+        patch,
+        { new: true },
+      )
+      .lean();
   }
 }

@@ -18,6 +18,9 @@ export class RecurringTransactionResponse {
   category: string;
   @ApiProperty()
   description: string;
+
+  @ApiProperty()
+  account: string;
   @ApiProperty()
   budgetId: string;
   @ApiProperty()

@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import {
+  RecurringPayment,
+  RecurringPaymentResult,
+} from 'src/dtos/recurring-transaction/recurring.transaction.pay.dto';
 import { dispatch } from 'nact';
 import { BudgetActor } from 'src/actors/budget.actor';
 import { NotificationsActor } from 'src/actors/notification.actor';
@@ -104,6 +108,7 @@ export class RecurringTransactionService {
         currency: r.currency,
         category: r.category,
         description: r.description,
+        account: r.account,
         budgetId: r.budgetId,
         frequency: r.frequency,
         interval: r.interval,
@@ -195,36 +200,112 @@ export class RecurringTransactionService {
 
       const due = await this.repository.getDue(now);
       if (due.length) {
-        this.logger.debug(`processing ${due.length} due recurring transactions`);
+        this.logger.debug(
+          `processing ${due.length} due recurring transactions`,
+        );
       }
       for (const r of due) {
-        await this.generateTransaction(r, now);
-        const next = this.computeNextRun(
+        // Claim it first, so a "paid" from the app at the same moment can't
+        // record it a second time.
+        const claimed = await this.repository.claimOccurrence(
+          r.id,
           new Date(r.nextRunAt),
-          r.frequency,
-          r.interval,
+          this.advance(r, now),
         );
-        const patch: Partial<RecurringTransaction> = {
-          lastRunAt: now,
-          nextRunAt: next,
-          updatedAt: now,
-        };
-        if (r.repeatUntil && next > new Date(r.repeatUntil)) {
-          patch.status = RecurringTransactionStatus.Closed;
-        }
-        await this.repository.update(r.id, patch);
+        if (claimed) await this.generateTransaction(r, now);
       }
     } catch (error) {
       this.logger.error('failed processing due recurring transactions', error);
     }
   }
 
+  /** Records the occurrence of [id] due at [payment.dueAt] now and moves
+   * the repeat on to the next one. Safe to repeat: a second try, or one
+   * after the scheduler recorded it, changes nothing. */
+  async payOccurrence(
+    id: string,
+    userId: string,
+    payment: RecurringPayment,
+  ): Promise<ApiResponseDto<RecurringPaymentResult>> {
+    try {
+      const r = await this.repository.getById(id);
+      if (!r || r.userId !== userId) {
+        return CommonResponses.NotFoundResponse(
+          'Recurring transaction not found',
+        );
+      }
+      const already = await this.transactionRepository.getTransactionById(
+        payment.transactionId,
+        userId,
+      );
+      if (already) {
+        return CommonResponses.OkResponse(
+          RecurringPaymentResult.AlreadyRecorded,
+        );
+      }
+      const now = new Date();
+      const dueAt = new Date(payment.dueAt);
+      const claimed = await this.repository.claimOccurrence(
+        id,
+        dueAt,
+        this.advance(r, now),
+      );
+      if (!claimed) {
+        if (r.status !== RecurringTransactionStatus.Active) {
+          return CommonResponses.ConflictResponse('This repeat has ended');
+        }
+        return CommonResponses.OkResponse(
+          RecurringPaymentResult.AlreadyRecorded,
+        );
+      }
+      const paidAt = payment.date ? new Date(payment.date) : now;
+      await this.generateTransaction(
+        r,
+        isNaN(paidAt.getTime()) ? now : paidAt,
+        payment.transactionId,
+        false,
+      );
+      return CommonResponses.OkResponse(
+        RecurringPaymentResult.Recorded,
+        'Recorded',
+      );
+    } catch (error) {
+      this.logger.error('failed to pay recurring occurrence', error, id);
+      return CommonResponses.InternalServerErrorResponse(
+        'An error occurred while recording it',
+      );
+    }
+  }
+
+  /** The change that moves [r] past its current occurrence. */
+  private advance(
+    r: RecurringTransaction,
+    now: Date,
+  ): Partial<RecurringTransaction> {
+    const next = this.computeNextRun(
+      new Date(r.nextRunAt),
+      r.frequency,
+      r.interval,
+    );
+    return {
+      lastRunAt: now,
+      nextRunAt: next,
+      updatedAt: now,
+      ...(r.repeatUntil &&
+        next > new Date(r.repeatUntil) && {
+          status: RecurringTransactionStatus.Closed,
+        }),
+    };
+  }
+
   private async generateTransaction(
     r: RecurringTransaction,
     now: Date,
+    id: string = generateId(),
+    notify = true,
   ): Promise<void> {
     const transaction: Transaction = {
-      id: generateId(),
+      id,
       createdAt: now,
       createdBy: r.username,
       updatedAt: null,
@@ -254,7 +335,8 @@ export class RecurringTransactionService {
     if (transaction.budgetId) {
       dispatch(this.budgetActor.updateBudgetDetails, transaction);
     }
-    await this.notifyUser(r, transaction);
+    // Paid from the app: they know already.
+    if (notify) await this.notifyUser(r, transaction);
   }
 
   /// Notifies the user that a recurring transaction was processed and a

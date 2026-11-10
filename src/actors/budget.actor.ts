@@ -6,6 +6,8 @@ import { Transaction } from 'src/schemas/transaction.schema';
 import { NotificationsActor } from './notification.actor';
 import { FcmNotificationRequest } from 'src/dtos/notification/fcm.notification.request.dto';
 import { UserRepository } from 'src/repositories/user.repository';
+import { Budget } from 'src/schemas/budget.schema';
+import { budgetAlertFor, budgetAlertMessage } from 'src/utils/budget-alerts';
 
 @Injectable()
 export class BudgetActor extends BaseActor {
@@ -34,6 +36,7 @@ export class BudgetActor extends BaseActor {
           return;
         }
 
+        const before = Number(budget.progressValue) || 0;
         budget.progressValue = amount;
         budget.limitExceeded = budget.progressValue > budget.amount;
         budget.updatedAt = new Date();
@@ -42,38 +45,7 @@ export class BudgetActor extends BaseActor {
         }
         await this.budgetRepository.updateAsync(budget);
 
-        //handle processing notification
-        const progressPercentage = (budget.progressValue / budget.amount) * 100;
-        const notificationPercentage =
-          parseFloat(budget.receiveAlertPercentage.toString()) * 100;
-
-        //notification params;
-        const fcmRequest: FcmNotificationRequest = {
-          notification: {},
-          data: {},
-          token: '',
-        };
-        if (
-          progressPercentage >= notificationPercentage &&
-          !budget.limitExceeded
-        ) {
-          //send notification about progress
-          fcmRequest.notification.title = 'Budget Progress Alert';
-          fcmRequest.notification.body = `Heads up! 🚨 You’re nearing your budget limit for ${budget.title}. You’ve spent ${budget.progressValue.toFixed(2)} out of ${budget.amount.toFixed(2)}. Keep an eye on your spending!`;
-        }
-
-        if (budget.limitExceeded) {
-          //send notification about limit exceeded
-          fcmRequest.notification.title = 'Budget Limit Exceeded';
-          fcmRequest.notification.body = `Overspending Alert! 🛑 You’ve exceeded your budget for ${budget.title} by ${(budget.progressValue - budget.amount).toFixed(2)}. Consider reviewing your expenses.`;
-        }
-
-        const user = await this.userRepository.getByIdAsync(budget.createdBy);
-        if (user && user.fcmToken?.length > 0) {
-          fcmRequest.token = user.fcmToken;
-          this.logger.debug('sending fcm notification', fcmRequest);
-          dispatch(this.notificationActor.sendFcmNotication, fcmRequest);
-        }
+        await this.alertIfCrossed(budget, before);
       } catch (error) {
         this.logger.error(
           'an error occurred while processing budget update request',
@@ -95,6 +67,7 @@ export class BudgetActor extends BaseActor {
           return;
         }
 
+        const before = Number(budget.progressValue) || 0;
         budget.progressValue =
           parseFloat(budget.progressValue.toString()) +
           parseFloat(msg.amount.toString());
@@ -105,38 +78,7 @@ export class BudgetActor extends BaseActor {
         }
         const res = await this.budgetRepository.updateAsync(budget);
 
-        //handle processing notification
-        const progressPercentage = (budget.progressValue / budget.amount) * 100;
-        const notificationPercentage =
-          parseFloat(budget.receiveAlertPercentage.toString()) * 100;
-
-        //notification params;
-        const fcmRequest: FcmNotificationRequest = {
-          notification: {},
-          data: {},
-          token: '',
-        };
-        if (
-          progressPercentage >= notificationPercentage &&
-          !budget.limitExceeded
-        ) {
-          //send notification about progress
-          fcmRequest.notification.title = 'Budget Progress Alert';
-          fcmRequest.notification.body = `Heads up! 🚨 You’re nearing your budget limit for ${budget.title}. You’ve spent ${budget.progressValue.toFixed(2)} out of ${budget.amount.toFixed(2)}. Keep an eye on your spending!`;
-        }
-
-        if (budget.limitExceeded) {
-          //send notification about limit exceeded
-          fcmRequest.notification.title = 'Budget Limit Exceeded';
-          fcmRequest.notification.body = `Overspending Alert! 🛑 You’ve exceeded your budget for ${budget.title} by ${(budget.progressValue - budget.amount).toFixed(2)}. Consider reviewing your expenses.`;
-        }
-
-        const user = await this.userRepository.getByIdAsync(budget.createdBy);
-        if (user && user.fcmToken?.length > 0) {
-          fcmRequest.token = user.fcmToken;
-          this.logger.debug('sending fcm notification', fcmRequest);
-          dispatch(this.notificationActor.sendFcmNotication, fcmRequest);
-        }
+        await this.alertIfCrossed(budget, before);
 
         this.logger.debug('budget details updated successfully', res);
       } catch (error) {
@@ -148,4 +90,20 @@ export class BudgetActor extends BaseActor {
       }
     },
   );
+
+  /** Sends the owner a push when this change crossed the warning level or
+   * the limit (once each, see [budgetAlertFor]). */
+  private async alertIfCrossed(budget: Budget, before: number) {
+    const kind = budgetAlertFor(budget, before, Number(budget.progressValue));
+    if (!kind) return;
+    const user = await this.userRepository.getByIdAsync(budget.createdBy);
+    if (!user?.fcmToken) return;
+    const message = budgetAlertMessage(kind, budget, user.currency);
+    const request: FcmNotificationRequest = {
+      token: user.fcmToken,
+      notification: { title: message.title, body: message.body },
+      data: message.data,
+    };
+    dispatch(this.notificationActor.sendFcmNotication, request);
+  }
 }

@@ -1,3 +1,4 @@
+import { literalPattern, transactionQuery } from 'src/utils/transaction-query';
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -63,11 +64,9 @@ export class TransactionRepository {
     if (filter.repeatTransaction != null) {
       query.repeatTransaction = filter.repeatTransaction;
     }
-    if (filter.query) {
-      query.$or = [
-        { category: { $regex: filter.query, $options: 'i' } },
-        { description: { $regex: filter.query, $options: 'i' } },
-      ];
+    if (typeof filter.query === 'string' && filter.query.trim()) {
+      const pattern = literalPattern(filter.query.trim().slice(0, 100));
+      query.$or = [{ category: pattern }, { description: pattern }];
     }
     if (filter.period) {
       const { startDate, endDate } =
@@ -185,30 +184,7 @@ export class TransactionRepository {
     filter: TransactionFilter,
     user: UserJwtDetails,
   ): Promise<Transaction[]> {
-    const query: any = {
-      userId: user.id,
-    };
-    if (filter.currency) {
-      query.currency = filter.currency;
-    }
-    if (filter.category) {
-      query.category = filter.category;
-    }
-    if (filter.type) {
-      query.type = filter.type;
-    }
-    if (filter.repeatTransaction != null) {
-      query.repeatTransaction = filter.repeatTransaction;
-    }
-    if (filter.budgetId) {
-      query.budgetId = filter.budgetId;
-    }
-    if (filter.query) {
-      query.$or = [
-        { category: { $regex: filter.query, $options: 'i' } },
-        { description: { $regex: filter.query, $options: 'i' } },
-      ];
-    }
+    const query: any = transactionQuery(filter, user.id);
     if (filter.period) {
       const { startDate, endDate } =
         convertTransactionFilterPeriodToDateTimeRange(filter.period);
@@ -229,43 +205,7 @@ export class TransactionRepository {
     filter: TransactionFilter,
     user: UserJwtDetails,
   ): Promise<PagedResults<Transaction>> {
-    const query: any = {
-      userId: user.id,
-    };
-    if (filter.currency) {
-      query.currency = filter.currency;
-    }
-    if (filter.category) {
-      query.category = filter.category;
-    }
-    if (filter.type) {
-      query.type = filter.type;
-    }
-    if (filter.repeatTransaction != null) {
-      query.repeatTransaction = filter.repeatTransaction;
-    }
-    if (filter.budgetId) {
-      query.budgetId = filter.budgetId;
-    }
-    if (filter.startDate && filter.endDate) {
-      const startDate = new Date(
-        new Date(filter.startDate).setHours(0, 0, 0, 0),
-      );
-      var endDate = new Date(
-        new Date(filter.endDate).setHours(23, 59, 59, 999),
-      );
-      query.createdAt = {
-        $gte: startDate,
-        $lte: endDate,
-      };
-    }
-
-    if (filter.query) {
-      query.$or = [
-        { category: { $regex: filter.query, $options: 'i' } },
-        { description: { $regex: filter.query, $options: 'i' } },
-      ];
-    }
+    const query: any = transactionQuery(filter, user.id);
     if (filter.period && filter.period.length > 1) {
       const { startDate, endDate } =
         convertTransactionFilterPeriodToDateTimeRange(filter.period);
@@ -274,11 +214,18 @@ export class TransactionRepository {
         $lte: endDate,
       };
     }
+    const page = Math.max(1, Math.floor(Number(filter.page) || 1));
+    const pageSize = Math.min(
+      200,
+      Math.max(1, Math.floor(Number(filter.pageSize) || 10)),
+    );
+    filter.page = page;
+    filter.pageSize = pageSize;
     const totalCount = await this.transactionRepository.countDocuments(query);
     const data = await this.transactionRepository
       .find(query)
-      .skip(Math.abs(filter.page - 1) * filter.pageSize)
-      .limit(filter.pageSize)
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
       .sort({ createdAt: -1 })
       .lean();
 

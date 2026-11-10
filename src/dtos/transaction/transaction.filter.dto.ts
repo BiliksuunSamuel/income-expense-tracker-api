@@ -26,4 +26,18 @@ export class TransactionFilter extends BaseFilter {
 
   @ApiProperty({ required: false, default: null })
   endDate: Date;
+
+  /** Several category titles, comma-separated. */
+  @ApiProperty({ required: false, default: null })
+  categories?: string;
+
+  /** An account id. */
+  @ApiProperty({ required: false, default: null })
+  account?: string;
+
+  @ApiProperty({ required: false, default: null })
+  minAmount?: number;
+
+  @ApiProperty({ required: false, default: null })
+  maxAmount?: number;
 }

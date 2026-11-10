@@ -126,8 +126,12 @@ export class TransactionController {
   @Get(':id')
   @ApiResponse({ type: Transaction })
   @ApiParam({ name: 'id', type: String })
-  async getTransactionById(@Res() response: Response, @Param('id') id: string) {
-    const res = await this.transactionService.getTransactionById(id);
+  async getTransactionById(
+    @Res() response: Response,
+    @Param('id') id: string,
+    @AuthUser() user: UserJwtDetails,
+  ) {
+    const res = await this.transactionService.getTransactionById(id, user);
     response.status(res.code).send(res);
   }
   //get transactions
@@ -156,8 +160,12 @@ export class TransactionController {
   //delete transaction
   @Delete(':id')
   @ApiParam({ name: 'id', type: String })
-  async deleteTransaction(@Param('id') id: string, @Res() response: Response) {
-    const res = await this.transactionService.deleteTransaction(id);
+  async deleteTransaction(
+    @Param('id') id: string,
+    @Res() response: Response,
+    @AuthUser() user: UserJwtDetails,
+  ) {
+    const res = await this.transactionService.deleteTransaction(id, user);
     response.status(res.code).send(res);
   }
 }

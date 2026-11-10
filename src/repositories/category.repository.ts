@@ -1,59 +1,159 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { CategoryInput } from 'src/dtos/category/category.input.dto';
-import { CategoryType } from 'src/enums';
+import { CategoryKind, CategoryType } from 'src/enums';
 import { Category } from 'src/schemas/category.schema';
-import { generateId } from 'src/utils';
+import { RecurringTransaction } from 'src/schemas/recurring.transaction.schema';
+import { Transaction } from 'src/schemas/transaction.schema';
+
+const DUPLICATE_KEY = 11000;
 
 @Injectable()
-export class CategoryRepository {
+export class CategoryRepository implements OnModuleInit {
+  private readonly logger = new Logger(CategoryRepository.name);
+
   constructor(
-    @InjectModel(Category.name)
-    private readonly categoryRepository: Model<Category>,
+    @InjectModel(Category.name) private readonly categories: Model<Category>,
+    @InjectModel(Transaction.name)
+    private readonly transactions: Model<Transaction>,
+    @InjectModel(RecurringTransaction.name)
+    private readonly recurring: Model<RecurringTransaction>,
   ) {}
 
-  //get category for user
-  async getCategories(creatorId: string): Promise<Category[]> {
-    const userCategories = await this.categoryRepository
-      .find({
-        $or: [{ creatorId }, { type: CategoryType.General }],
-      })
+  async onModuleInit() {
+    try {
+      await this.categories.collection.createIndex(
+        { creatorId: 1, kind: 1, titleKey: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { titleKey: { $type: 'string' } },
+        },
+      );
+    } catch (error) {
+      this.logger.error('could not create the category title index', error);
+    }
+  }
+
+  /** Every category [userId] owns, including old ones without a kind. */
+  async ownedBy(userId: string): Promise<Category[]> {
+    return this.categories
+      .find({ creatorId: userId, type: { $ne: CategoryType.General } })
+      .sort({ position: 1, createdAt: 1 })
       .lean();
-    return userCategories;
   }
 
-  //get category by id
-  async getCategoryById(id: string): Promise<Category> {
-    const category = await this.categoryRepository.findById(id).lean();
-    return category;
+  async byId(id: string, userId: string): Promise<Category | null> {
+    return this.categories.findOne({ id, creatorId: userId }).lean();
   }
 
-  //delete category
-  async deleteCategory(id: string): Promise<Category> {
-    const category = await this.categoryRepository.findByIdAndDelete(id).lean();
-    return category;
+  async ownerOf(id: string): Promise<string | null> {
+    const doc = await this.categories.findOne({ id }, { creatorId: 1 }).lean();
+    return doc?.creatorId ?? null;
   }
 
-  //create category
-  async createCategory(category: CategoryInput): Promise<Category> {
-    const doc = await this.categoryRepository.create({
-      id: generateId(),
-      title: category.title,
-      creatorId: category.creatorId,
-      type: category.creatorId ? CategoryType.Personal : CategoryType.General,
-    });
-    const newCategory = doc.toObject();
-    return newCategory;
-  }
-
-  //get category by title
-  //this is used to check if a category with the same title exists
-  //ignore the casing of the title
-  async getCategoryByTitle(title: string): Promise<Category> {
-    const category = await this.categoryRepository
-      .findOne({ title: { $regex: new RegExp(title, 'i') } })
+  async byTitle(
+    userId: string,
+    kind: CategoryKind,
+    key: string,
+  ): Promise<Category | null> {
+    return this.categories
+      .findOne({ creatorId: userId, kind, titleKey: key })
       .lean();
-    return category;
+  }
+
+  /** Inserts [docs], skipping any whose title the user already has. */
+  async insertMissing(docs: Category[]): Promise<void> {
+    if (docs.length === 0) return;
+    try {
+      await this.categories.insertMany(docs, { ordered: false });
+    } catch (error) {
+      const dupOnly = (error?.writeErrors ?? [error]).every(
+        (e: any) => (e?.code ?? e?.err?.code) === DUPLICATE_KEY,
+      );
+      if (!dupOnly) throw error;
+    }
+  }
+
+  async create(doc: Category): Promise<Category> {
+    await this.categories.create(doc);
+    return doc;
+  }
+
+  async update(
+    id: string,
+    userId: string,
+    changes: Partial<Category>,
+  ): Promise<Category | null> {
+    return this.categories
+      .findOneAndUpdate({ id, creatorId: userId }, changes, { new: true })
+      .lean();
+  }
+
+  async delete(id: string, userId: string): Promise<Category | null> {
+    return this.categories.findOneAndDelete({ id, creatorId: userId }).lean();
+  }
+
+  /** Sets each of [ids]' position to its index; ids the user doesn't own
+   * are ignored. */
+  async reorder(userId: string, ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.categories.bulkWrite(
+      ids.map((id, position) => ({
+        updateOne: {
+          filter: { id, creatorId: userId },
+          update: { $set: { position } },
+        },
+      })),
+      { ordered: false },
+    );
+  }
+
+  async hasChildren(id: string, userId: string): Promise<boolean> {
+    return (
+      (await this.categories.exists({ creatorId: userId, parentId: id })) !=
+      null
+    );
+  }
+
+  /** Whether any of the user's transactions or repeats use [title]. */
+  async isUsed(
+    userId: string,
+    kind: CategoryKind,
+    title: string,
+  ): Promise<boolean> {
+    const query = { userId, type: kind, category: title };
+    const [t, r] = await Promise.all([
+      this.transactions.exists(query),
+      this.recurring.exists(query),
+    ]);
+    return t != null || r != null;
+  }
+
+  /** Carries a rename into the user's transactions and repeats. */
+  async renameInEntries(
+    userId: string,
+    kind: CategoryKind,
+    from: string,
+    to: string,
+  ): Promise<number> {
+    const query = { userId, type: kind, category: from };
+    const [t] = await Promise.all([
+      this.transactions.updateMany(query, { category: to }),
+      this.recurring.updateMany(query, { category: to }),
+    ]);
+    return t.modifiedCount ?? 0;
+  }
+
+  /** The (title, type) pairs the user's transactions use. */
+  async usedTitles(
+    userId: string,
+  ): Promise<{ title: string; kind: CategoryKind }[]> {
+    const rows = await this.transactions.aggregate<{
+      _id: { title: string; kind: CategoryKind };
+    }>([
+      { $match: { userId, category: { $type: 'string', $ne: '' } } },
+      { $group: { _id: { title: '$category', kind: '$type' } } },
+    ]);
+    return rows.map((r) => r._id);
   }
 }

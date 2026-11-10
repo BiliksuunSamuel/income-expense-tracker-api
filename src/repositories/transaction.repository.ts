@@ -293,27 +293,42 @@ export class TransactionRepository {
     return res;
   }
 
-  async getTransactionById(transactionId: string): Promise<Transaction> {
+  async getTransactionById(
+    transactionId: string,
+    userId: string,
+  ): Promise<Transaction> {
     const doc = await this.transactionRepository
-      .findOne({ id: transactionId })
+      .findOne({ id: transactionId, userId })
       .lean();
     return doc;
+  }
+
+  /** Who owns [transactionId], if it exists at all (any user). */
+  async getTransactionOwner(transactionId: string): Promise<string | null> {
+    const doc = await this.transactionRepository
+      .findOne({ id: transactionId }, { userId: 1 })
+      .lean();
+    return doc?.userId ?? null;
   }
 
   async updateTransaction(
     transactionId: string,
+    userId: string,
     transaction: Transaction,
   ): Promise<Transaction> {
     const { _id, ...rest } = transaction as any;
     const doc = await this.transactionRepository
-      .findOneAndUpdate({ id: transactionId }, rest, { new: true })
+      .findOneAndUpdate({ id: transactionId, userId }, rest, { new: true })
       .lean();
     return doc;
   }
 
-  async deleteTransaction(transactionId: string): Promise<Transaction> {
+  async deleteTransaction(
+    transactionId: string,
+    userId: string,
+  ): Promise<Transaction> {
     const doc = await this.transactionRepository
-      .findOneAndDelete({ id: transactionId })
+      .findOneAndDelete({ id: transactionId, userId })
       .lean();
     return doc;
   }

@@ -1,3 +1,4 @@
+import { CategoryKind } from 'src/enums';
 import { Injectable, Logger } from '@nestjs/common';
 import { dispatch } from 'nact';
 import { BudgetActor } from 'src/actors/budget.actor';
@@ -20,6 +21,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ExportTransactionToExcel } from 'src/utils/export-utlity';
 import { RecurringTransactionService } from 'src/services/recurring.transaction.service';
+import { AccountService } from 'src/services/account.service';
 
 @Injectable()
 export class TransactionService {
@@ -31,6 +33,7 @@ export class TransactionService {
     private readonly categoryActor: CategoryActor,
     private readonly subscriptionRepository: SubscriptionRepository,
     private readonly recurringTransactionService: RecurringTransactionService,
+    private readonly accountService: AccountService,
     @InjectModel(Transaction.name)
     private readonly transactionModel: Model<Transaction>,
   ) {}
@@ -191,11 +194,16 @@ export class TransactionService {
   }
 
   //get transaction by id
-  async getTransactionById(id: string): Promise<ApiResponseDto<Transaction>> {
+  async getTransactionById(
+    id: string,
+    user: UserJwtDetails,
+  ): Promise<ApiResponseDto<Transaction>> {
     try {
       this.logger.debug('received request to get transaction by id\n', id);
-      const transaction =
-        await this.transactionRepository.getTransactionById(id);
+      const transaction = await this.transactionRepository.getTransactionById(
+        id,
+        user.id,
+      );
 
       if (!transaction) {
         return CommonResponses.NotFoundResponse('Transaction not found');
@@ -251,9 +259,15 @@ export class TransactionService {
     }
   }
 
-  async deleteTransaction(id: string): Promise<ApiResponseDto<Transaction>> {
+  async deleteTransaction(
+    id: string,
+    user: UserJwtDetails,
+  ): Promise<ApiResponseDto<Transaction>> {
     try {
-      const res = await this.transactionRepository.deleteTransaction(id);
+      const res = await this.transactionRepository.deleteTransaction(
+        id,
+        user.id,
+      );
       if (!res) {
         return CommonResponses.NotFoundResponse<Transaction>(
           'Transaction not found',
@@ -293,14 +307,29 @@ export class TransactionService {
     user: UserJwtDetails,
   ): Promise<ApiResponseDto<boolean>> {
     try {
-      const doc = await this.transactionRepository.getTransactionById(id);
+      const doc = await this.transactionRepository.getTransactionById(
+        id,
+        user.id,
+      );
       if (!doc) {
         return CommonResponses.NotFoundResponse('Transaction not found');
       }
 
+      const parsed = request.date ? new Date(request.date) : null;
+      const when = parsed && !isNaN(parsed.getTime()) ? parsed : null;
+
       const updatedDoc: Transaction = {
         ...doc,
+        ...(when && {
+          createdAt: when,
+          month: when.getMonth(),
+          year: when.getFullYear(),
+        }),
         amount: request.amount,
+        account: await this.accountService.resolveAccountId(
+          user,
+          request.account ?? doc.account,
+        ),
         repeatFrequency: request.repeatFrequency,
         repeatInterval: request.repeatInterval,
         repeatTransactionEndDate: request.repeatTransactionEndDate,
@@ -320,6 +349,7 @@ export class TransactionService {
 
       const res = await this.transactionRepository.updateTransaction(
         id,
+        user.id,
         updatedDoc,
       );
 
@@ -343,8 +373,9 @@ export class TransactionService {
 
       //produce event to add category for user if it doesnt exist
       dispatch(this.categoryActor.createNewCategory, {
-        creatorId: user.id,
+        user: { id: user.id, email: user.email },
         title: updatedDoc.category,
+        kind: updatedDoc.type as unknown as CategoryKind,
       });
 
       return CommonResponses.OkResponse(
@@ -372,19 +403,42 @@ export class TransactionService {
     try {
       this.logger.debug('received request to creat transaction\n', user);
 
+      const { id: clientId, date, ...fields } = request;
+
+      // A retry of a create that already went through (offline sync).
+      if (clientId) {
+        const owner =
+          await this.transactionRepository.getTransactionOwner(clientId);
+        if (owner === user.id) {
+          return CommonResponses.OkResponse(true, 'Transaction already saved');
+        }
+        if (owner) {
+          return CommonResponses.ConflictResponse(
+            'A transaction with this id already exists',
+          );
+        }
+      }
+
+      const parsed = date ? new Date(date) : null;
+      const when = parsed && !isNaN(parsed.getTime()) ? parsed : new Date();
+
       var subscriptionInfo =
         await this.subscriptionRepository.getUserActiveSubscriptionWithInvoiceAsync(
           user.id,
         );
       const transaction: Transaction = {
-        ...request,
+        ...fields,
+        account: await this.accountService.resolveAccountId(
+          user,
+          fields.account,
+        ),
         username: user.email,
         userId: user.id,
-        createdAt: new Date(),
+        createdAt: when,
         createdBy: user.email,
-        id: generateId(),
-        month: new Date().getMonth(),
-        year: new Date().getFullYear(),
+        id: clientId ?? generateId(),
+        month: when.getMonth(),
+        year: when.getFullYear(),
         updatedAt: null,
         updatedBy: null,
         invoiceId: subscriptionInfo?.invoice?.id || null,
@@ -413,8 +467,9 @@ export class TransactionService {
 
       //produce event to add category for user if it doesnt exist
       dispatch(this.categoryActor.createNewCategory, {
-        creatorId: user.id,
+        user: { id: user.id, email: user.email },
         title: transaction.category,
+        kind: transaction.type as unknown as CategoryKind,
       });
 
       return CommonResponses.OkResponse(true, 'Transaction added successfully');

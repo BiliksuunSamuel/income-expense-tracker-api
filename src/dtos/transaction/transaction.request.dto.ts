@@ -1,8 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+} from 'class-validator';
 import { TransactionRepeatFrequency, TransactionType } from 'src/enums';
 
 export class TransactionRequest {
+  /** Made by the app so a retried create saves once (offline sync). */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Matches(/^[A-Za-z0-9-]{8,64}$/)
+  id?: string;
+
+  /** When it happened; defaults to now. */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
   @ApiProperty()
   @IsEnum(TransactionType)
   @IsNotEmpty()

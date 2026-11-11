@@ -31,7 +31,8 @@ export class ProxyHttpService {
 
   async request<T>(request: HttpRequestDto): Promise<T> {
     try {
-      this.logger.debug('making http request', request);
+      // Never the request itself: it carries the secret key.
+      this.logger.debug(`making http request ${request.method} ${request.url}`);
 
       const res = await this.httpService.axiosRef({
         method: request.method,
@@ -46,7 +47,10 @@ export class ProxyHttpService {
       this.logger.debug('response from http request', res.data);
       return res.data as T;
     } catch (error) {
-      this.logger.error('an error occurred while making http request', error);
+      this.logger.error(
+        `an error occurred while making http request ${request.method} ${request.url}`,
+        error?.response?.data ?? error?.message,
+      );
       throw error;
     }
   }

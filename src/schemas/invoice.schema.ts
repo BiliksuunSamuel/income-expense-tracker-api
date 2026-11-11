@@ -2,6 +2,7 @@ import { Prop, Schema } from '@nestjs/mongoose';
 import { BaseSchema } from '.';
 import { ApiProperty } from '@nestjs/swagger';
 import { PaymentStatus } from 'src/enums';
+import { PaymentGatewayDetails } from 'src/utils/paystack';
 
 @Schema()
 export class Invoice extends BaseSchema {
@@ -22,7 +23,7 @@ export class Invoice extends BaseSchema {
   @ApiProperty()
   status: PaymentStatus;
 
-  @Prop({ type: Date, defualt: null })
+  @Prop({ type: Date, default: null })
   @ApiProperty()
   datePaid: Date;
 
@@ -57,4 +58,25 @@ export class Invoice extends BaseSchema {
   @Prop({ type: String })
   @ApiProperty()
   authorizationUrl: string;
+
+  /// Every checkout started for this invoice, the latest last.
+  @Prop({ type: [String], default: [] })
+  @ApiProperty({ type: [String] })
+  paymentReferences: string[];
+
+  @Prop({ type: Date, default: null })
+  @ApiProperty()
+  paymentStartedAt: Date;
+
+  @Prop({ type: String, default: null })
+  @ApiProperty()
+  paymentMethod: string;
+
+  @Prop({ type: String, default: null })
+  @ApiProperty()
+  failureReason: string;
+
+  @Prop({ type: Object, default: null })
+  @ApiProperty()
+  gateway: PaymentGatewayDetails;
 }

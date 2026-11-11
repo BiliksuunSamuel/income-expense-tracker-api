@@ -10,7 +10,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.enableCors({ origin: '*' });
-  app.use(bodyParser.json({ limit: '100mb' }));
+  // The raw body too, for checking Paystack's webhook signature.
+  app.use(
+    bodyParser.json({
+      limit: '100mb',
+      verify: (req: any, _res, buf: Buffer) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(bodyParser.urlencoded({ limit: '100mb', extended: true }));
 
   //

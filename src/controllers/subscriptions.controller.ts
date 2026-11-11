@@ -15,6 +15,7 @@ import { SubscriptionRequestDto } from 'src/dtos/billing-plan/subscription-reque
 import { SubscriptionResponse } from 'src/dtos/billing-plan/subscription-response.dto';
 import { SubscriptionsFilter } from 'src/dtos/billing-plan/subscriptions-filter.dto';
 import { AuthUser } from 'src/extensions/auth.extensions';
+import { AdminGuard } from 'src/providers/admin.guard';
 import { JwtAuthGuard } from 'src/providers/jwt-auth..guard';
 import { SubscriptionService } from 'src/services/subscription.service';
 
@@ -24,7 +25,9 @@ import { SubscriptionService } from 'src/services/subscription.service';
 export class SubscriptionsController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
+  /// Everyone's subscriptions: admins only.
   @Get()
+  @UseGuards(AdminGuard)
   async filterSubscriptions(
     @Query() filter: SubscriptionsFilter,
     @Res() response: Response,
@@ -33,6 +36,8 @@ export class SubscriptionsController {
     response.status(res.code).send(res);
   }
 
+  /// Chooses a plan. A paid one comes back with its invoice, whose checkout
+  /// the app opens; the plan starts once Paystack confirms the payment.
   @Post()
   @ApiResponse({ type: SubscriptionResponse })
   async createSubscription(
@@ -64,8 +69,10 @@ export class SubscriptionsController {
     @Res() response: Response,
     @AuthUser() user: UserJwtDetails,
   ) {
-    const res =
-      await this.subscriptionService.getSubscriptionById(subscriptionId);
+    const res = await this.subscriptionService.getSubscriptionById(
+      subscriptionId,
+      user.id,
+    );
     response.status(res.code).send(res);
   }
 }

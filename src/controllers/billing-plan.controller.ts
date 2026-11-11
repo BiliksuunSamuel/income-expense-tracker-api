@@ -1,9 +1,20 @@
-import { Body, Controller, Get, Param, Patch, Post, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { BillingPlanRequestDto } from 'src/dtos/billing-plan/billing-plan-request.dto';
 import { AuthUser } from 'src/extensions/auth.extensions';
+import { AdminGuard } from 'src/providers/admin.guard';
+import { JwtAuthGuard } from 'src/providers/jwt-auth..guard';
 import { BillingPlan } from 'src/schemas/billing.plan.schema';
 import { BillingPlanService } from 'src/services/billing.plan.service';
 
@@ -20,6 +31,7 @@ export class BillingPlanController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiResponse({ type: BillingPlan })
   async createBillingPlan(
     @Body() request: BillingPlanRequestDto,
@@ -31,6 +43,7 @@ export class BillingPlanController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiResponse({ type: BillingPlan })
   @ApiParam({ name: 'id', required: true })
   async updateBillingPlan(

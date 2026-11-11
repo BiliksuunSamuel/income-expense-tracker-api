@@ -85,6 +85,10 @@ export class AppModule {
         // invoices
         { path: 'api/invoices/pay/(.*)', method: RequestMethod.POST }, // /pay/:id
         { path: 'api/invoices/update-status', method: RequestMethod.GET },
+        { path: 'api/invoices/(.*)/confirm', method: RequestMethod.POST },
+
+        // Paystack's events
+        { path: 'api/payments/paystack/webhook', method: RequestMethod.POST },
         { path: 'api/invoices/client', method: RequestMethod.GET },
         { path: 'api/invoices/(.*)', method: RequestMethod.GET }, // /:invoiceId and any other GET under invoices
       )

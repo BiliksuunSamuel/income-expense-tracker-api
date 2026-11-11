@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { dispatch } from 'nact';
-import { InvoiceActor } from 'src/actors/invoice.actor';
 import { ApiResponseDto } from 'src/common/api.response.dto';
 import { PagedResults } from 'src/common/paged.results.dto';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
@@ -15,6 +13,34 @@ import { UserRepository } from 'src/repositories/user.repository';
 import { BillingPlan } from 'src/schemas/billing.plan.schema';
 import { Subscription } from 'src/schemas/subscription.schema';
 import { calculateYearlyPrice, generateId } from 'src/utils';
+import { literalPattern } from 'src/utils/transaction-query';
+import { InvoiceService, InvoiceView } from './invoice.service';
+
+/// A chosen plan, with the invoice to pay when it isn't free.
+export type SubscriptionPurchase = SubscriptionResponse & {
+  invoice: InvoiceView | null;
+};
+
+function toResponse(
+  doc: Subscription,
+  plan: BillingPlan,
+): SubscriptionResponse {
+  return {
+    startDate: doc.startDate,
+    endDate: doc.endDate,
+    isActive: doc.isActive,
+    planTitle: doc.planTitle,
+    plan: calculateYearlyPrice(plan),
+    maxNumberOfTransactions: doc.maxNumberOfTransactions,
+    status: doc.status,
+    billingFrequency: doc.billingFrequency,
+    id: doc.id,
+    createdAt: doc.createdAt,
+    createdBy: doc.createdBy,
+    updatedAt: doc.updatedAt,
+    updatedBy: doc.updatedBy,
+  };
+}
 
 @Injectable()
 export class SubscriptionService {
@@ -24,21 +50,22 @@ export class SubscriptionService {
     private readonly subscriptionModel: Model<Subscription>,
     @InjectModel(BillingPlan.name)
     private readonly billingPlanModel: Model<BillingPlan>,
-    private readonly invoiceActor: InvoiceActor,
+    private readonly invoiceService: InvoiceService,
     private readonly userRepository: UserRepository,
   ) {}
 
-  //buy subscription
+  /// Chooses [request]'s plan. A free plan starts now; a paid one waits,
+  /// with the current plan kept, until Paystack confirms its invoice (see
+  /// InvoiceService), and comes back with that invoice's checkout.
   async buySubscription(
     request: SubscriptionRequestDto,
     authUser: UserJwtDetails,
-  ): Promise<ApiResponseDto<SubscriptionResponse>> {
+  ): Promise<ApiResponseDto<SubscriptionPurchase>> {
     try {
       const billingPlan = await this.billingPlanModel
         .findOne({ id: request.billingPlanId })
         .lean();
       if (!billingPlan) {
-        this.logger.error('Billing plan not found', request, authUser);
         return CommonResponses.NotFoundResponse('Billing plan not found');
       }
 
@@ -48,72 +75,77 @@ export class SubscriptionService {
           planTitle: billingPlan.title,
         });
         if (planAlreadyPurchased) {
-          //this plan is a one time purchase plan
-          this.logger.warn('User already has a regular plan', {
-            userId: authUser.id,
-            planTitle: billingPlan.title,
-          });
           return CommonResponses.ForbiddenResponse(
             'This plan is a one time purchase plan, please choose another plan.',
           );
         }
       }
 
-      const subscription = await this.subscriptionModel.create({
-        ...request,
+      const current = await this.subscriptionModel
+        .findOne({ userId: authUser.id, isActive: true })
+        .lean();
+      if (
+        current?.status === SubscriptionStatus.Active &&
+        current.billingPlanId === billingPlan.id &&
+        current.billingFrequency === request.billingFrequency
+      ) {
+        return CommonResponses.ConflictResponse("You're already on this plan.");
+      }
+
+      const free = billingPlan.price <= 0;
+      const now = new Date();
+      // Earlier choices left unpaid give way to this one.
+      await this.subscriptionModel.updateMany(
+        {
+          userId: authUser.id,
+          isActive: false,
+          status: SubscriptionStatus.Pending,
+        },
+        { status: SubscriptionStatus.Closed, updatedAt: now },
+      );
+      const doc = await this.subscriptionModel.create({
+        billingFrequency: request.billingFrequency,
         userId: authUser.id,
-        isActive: true,
-        startDate: new Date(),
-        endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+        isActive: free,
+        startDate: now,
+        endDate: new Date(new Date(now).setFullYear(now.getFullYear() + 1)),
         planTitle: billingPlan.title,
         id: generateId(),
-        createdAt: new Date(),
+        createdAt: now,
         createdBy: authUser?.email,
-        status:
-          billingPlan.price == 0
-            ? SubscriptionStatus.Active
-            : SubscriptionStatus.Pending,
+        status: free ? SubscriptionStatus.Active : SubscriptionStatus.Pending,
         maxNumberOfTransactions: billingPlan.maxNumberOfTransactions || 0,
         billingPlanId: billingPlan.id,
       });
-      this.logger.log(
-        'Subscription created successfully. Please settle your invoice to activate it.',
-        subscription.toObject(),
-        request,
-        authUser,
-      );
-      const doc = subscription.toObject();
-      const response: SubscriptionResponse = {
-        startDate: doc.startDate,
-        endDate: doc.endDate,
-        isActive: doc.isActive,
-        planTitle: doc.planTitle,
-        plan: calculateYearlyPrice(billingPlan),
-        maxNumberOfTransactions: doc.maxNumberOfTransactions,
-        status: doc.status,
-        billingFrequency: doc.billingFrequency,
-        id: doc.id,
-        createdAt: doc.createdAt,
-        createdBy: doc.createdBy,
-        updatedAt: doc.updatedAt,
-        updatedBy: doc.updatedBy,
-      };
-      // Create invoice for the subscription
-      dispatch(this.invoiceActor.createInvoiceForSubscription, {
+      const subscription = doc.toObject();
+      const invoice = await this.invoiceService.createForSubscription(
         subscription,
         billingPlan,
-      });
+      );
 
-      //Close other subscriptions for the user
-      await this.subscriptionModel.updateMany(
-        { userId: authUser.id, id: { $ne: subscription.id } },
-        { isActive: false, status: SubscriptionStatus.Closed },
+      if (free) {
+        await this.subscriptionModel.updateMany(
+          { userId: authUser.id, id: { $ne: subscription.id }, isActive: true },
+          { isActive: false, status: SubscriptionStatus.Closed, updatedAt: now },
+        );
+        return CommonResponses.OkResponse(
+          { ...toResponse(subscription, billingPlan), invoice: null },
+          'Subscription created successfully.',
+        );
+      }
+
+      const payment = await this.invoiceService.payInvoiceAsync(
+        invoice.id,
+        authUser,
       );
       return CommonResponses.OkResponse(
-        response,
-        billingPlan.price <= 0
-          ? 'Subscription created successfully.'
-          : 'Subscription created successfully. Please settle your invoice to activate it.',
+        {
+          ...toResponse(subscription, billingPlan),
+          invoice: payment.data ?? InvoiceService.view(invoice),
+        },
+        payment.data
+          ? 'Pay to start your new plan.'
+          : "Couldn't reach Paystack. Pay from your invoices to start the plan.",
       );
     } catch (error) {
       this.logger.error(
@@ -152,21 +184,7 @@ export class SubscriptionService {
           'You do not have an active subscription',
         );
       }
-      const response: SubscriptionResponse = {
-        startDate: activeSubscription.startDate,
-        endDate: activeSubscription.endDate,
-        isActive: activeSubscription.isActive,
-        planTitle: activeSubscription.planTitle,
-        plan: calculateYearlyPrice(billingPlan),
-        maxNumberOfTransactions: activeSubscription.maxNumberOfTransactions,
-        status: activeSubscription.status,
-        billingFrequency: activeSubscription.billingFrequency,
-        id: activeSubscription.id,
-        createdAt: activeSubscription.createdAt,
-        createdBy: activeSubscription.createdBy,
-        updatedAt: activeSubscription.updatedAt,
-        updatedBy: activeSubscription.updatedBy,
-      };
+      const response = toResponse(activeSubscription, billingPlan);
       this.logger.log('User active subscription fetched successfully', {
         userId,
         response,
@@ -188,9 +206,12 @@ export class SubscriptionService {
   //get subscription by id
   async getSubscriptionById(
     id: string,
+    userId: string,
   ): Promise<ApiResponseDto<SubscriptionResponse>> {
     try {
-      const subscription = await this.subscriptionModel.findOne({ id }).lean();
+      const subscription = await this.subscriptionModel
+        .findOne({ id, userId })
+        .lean();
       if (!subscription) {
         this.logger.warn('Subscription not found', { id });
         return CommonResponses.NotFoundResponse('Subscription not found');
@@ -202,21 +223,7 @@ export class SubscriptionService {
         this.logger.error('Billing plan not found for subscription', { id });
         return CommonResponses.NotFoundResponse('Billing plan not found');
       }
-      const response: SubscriptionResponse = {
-        startDate: subscription.startDate,
-        endDate: subscription.endDate,
-        isActive: subscription.isActive,
-        planTitle: subscription.planTitle,
-        plan: calculateYearlyPrice(billingPlan),
-        maxNumberOfTransactions: subscription.maxNumberOfTransactions,
-        status: subscription.status,
-        billingFrequency: subscription.billingFrequency,
-        id: subscription.id,
-        createdAt: subscription.createdAt,
-        createdBy: subscription.createdBy,
-        updatedAt: subscription.updatedAt,
-        updatedBy: subscription.updatedBy,
-      };
+      const response = toResponse(subscription, billingPlan);
       this.logger.log('Subscription fetched successfully', { id, response });
       return CommonResponses.OkResponse(
         response,
@@ -245,8 +252,8 @@ export class SubscriptionService {
       if (filter.isActive !== undefined) {
         query.isActive = filter.isActive;
       }
-      if (filter.query) {
-        query.planTitle = { $regex: filter.query, $options: 'i' };
+      if (typeof filter.query === 'string' && filter.query) {
+        query.planTitle = literalPattern(filter.query);
       }
       if (filter.billingPlanId) {
         query.billingPlanId = filter.billingPlanId;

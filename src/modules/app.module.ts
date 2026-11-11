@@ -106,6 +106,8 @@ export class AppModule {
         { path: 'api/authentication/logout', method: RequestMethod.POST },
         { path: 'api/authentication/google-auth', method: RequestMethod.POST },
         { path: 'api/authentication/register', method: RequestMethod.POST },
+        // the website's pricing
+        { path: 'api/billing-plans/public', method: RequestMethod.GET },
       )
       .forRoutes({
         path: '*',

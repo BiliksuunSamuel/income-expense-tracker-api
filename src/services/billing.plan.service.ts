@@ -79,6 +79,34 @@ export class BillingPlanService {
     }
   }
 
+  /// Every plan, Regular first then by price, with only what a visitor
+  /// needs to compare them.
+  async getPublicBillingPlans(): Promise<ApiResponseDto<Partial<BillingPlan>[]>> {
+    try {
+      const plans = await this.billingPlanModel.find({}).lean();
+      return CommonResponses.OkResponse(
+        plans
+          .map(calculateYearlyPrice)
+          .sort((a, b) => a.price - b.price)
+          .map((p) => ({
+            id: p.id,
+            title: p.title,
+            description: p.description,
+            price: p.price,
+            yearlyPrice: p.yearlyPrice,
+            yearlyDiscount: p.yearlyDiscount,
+            features: p.features ?? [],
+            unavailableFeatures: p.unavailableFeatures ?? [],
+            maxNumberOfTransactions: p.maxNumberOfTransactions,
+          })),
+        'Billing plans retrieved successfully',
+      );
+    } catch (error) {
+      this.logger.error('An error occurred while fetching public plans', error);
+      return CommonResponses.InternalServerErrorResponse();
+    }
+  }
+
   //get all billing plans
   async getBillingPlans(): Promise<ApiResponseDto<BillingPlan[]>> {
     try {

@@ -30,6 +30,13 @@ export class BillingPlanController {
     response.status(res.code).send(res);
   }
 
+  /// Every plan's price and limits for the public website; no sign-in.
+  @Get('public')
+  async getPublicBillingPlans(@Res() response: Response) {
+    const res = await this.billingPlanService.getPublicBillingPlans();
+    response.status(res.code).send(res);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiResponse({ type: BillingPlan })

@@ -84,4 +84,10 @@ export class Transaction extends BaseSchema {
   @Prop({ default: null })
   @ApiProperty()
   subscriptionId: string;
+
+  /// When the entry reached the server, whatever date it is for: the
+  /// monthly entry limit counts these.
+  @Prop({ type: Date, default: Date.now, index: true })
+  @ApiProperty()
+  recordedAt?: Date;
 }

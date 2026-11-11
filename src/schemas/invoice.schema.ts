@@ -1,7 +1,7 @@
 import { Prop, Schema } from '@nestjs/mongoose';
 import { BaseSchema } from '.';
 import { ApiProperty } from '@nestjs/swagger';
-import { PaymentStatus } from 'src/enums';
+import { InvoiceKind, PaymentStatus } from 'src/enums';
 import { PaymentGatewayDetails } from 'src/utils/paystack';
 
 @Schema()
@@ -79,4 +79,16 @@ export class Invoice extends BaseSchema {
   @Prop({ type: Object, default: null })
   @ApiProperty()
   gateway: PaymentGatewayDetails;
+
+  @Prop({ type: String, default: 'GHS' })
+  @ApiProperty()
+  currency: string;
+
+  @Prop({ type: String, enum: InvoiceKind, default: InvoiceKind.New })
+  @ApiProperty({ enum: InvoiceKind })
+  kind: InvoiceKind;
+
+  @Prop({ type: String, default: null })
+  @ApiProperty()
+  billingPlanId: string;
 }

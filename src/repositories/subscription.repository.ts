@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { PaymentStatus } from 'src/enums';
 import { Invoice } from 'src/schemas/invoice.schema';
 import { Subscription } from 'src/schemas/subscription.schema';
 
@@ -25,7 +26,11 @@ export class SubscriptionRepository {
     }
 
     const invoice = await this.invoiceModel
-      .findOne({ subscriptionId: subscription.id })
+      .findOne({
+        subscriptionId: subscription.id,
+        status: PaymentStatus.Completed,
+      })
+      .sort({ datePaid: -1 })
       .lean();
 
     return { subscription, invoice };

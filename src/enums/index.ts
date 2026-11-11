@@ -60,6 +60,13 @@ export enum PaymentStatus {
   Failed = 'Failed',
   Refunded = 'Refunded',
   Processing = 'Processing',
+  Cancelled = 'Cancelled',
+}
+
+/// Why an invoice was issued: choosing a plan, or the next period of one.
+export enum InvoiceKind {
+  New = 'New',
+  Renewal = 'Renewal',
 }
 
 export enum SubscriptionStatus {

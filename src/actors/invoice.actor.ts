@@ -6,7 +6,6 @@ import { Model } from 'mongoose';
 import { spawnStateless } from 'nact';
 import {
   generateId,
-  generateInvoiceNumber,
   getInvoiceAmount,
   getInvoiceStartDateAndEndDate,
 } from 'src/utils';
@@ -19,6 +18,7 @@ import {
   SubscriptionStatus,
 } from 'src/enums';
 import { User } from 'src/schemas/user.schema';
+import { InvoiceNumberService } from 'src/services/invoice-number.service';
 
 @Injectable()
 export class InvoiceActor extends BaseActor {
@@ -29,6 +29,7 @@ export class InvoiceActor extends BaseActor {
     private readonly subscriptionModel: Model<Subscription>,
     @InjectModel(BillingPlan.name)
     private readonly billingPlanRepository: Model<BillingPlan>,
+    private readonly invoiceNumbers: InvoiceNumberService,
   ) {
     super();
   }
@@ -100,13 +101,13 @@ export class InvoiceActor extends BaseActor {
           amount: getInvoiceAmount(billingPlan, subscription.billingFrequency),
           status,
           dueDate: new Date(),
-          description: `Invoice for ${billingPlan.title} subscription from ${billingCycle.startDate.toLocaleDateString()} to ${billingCycle.endDate.toLocaleDateString()}`,
+          description: `${billingPlan.title} plan, monthly`,
           datePaid: null,
           paymentReference: null,
           startDate: billingCycle.startDate,
           endDate: billingCycle.endDate,
           createdBy: subscription.createdBy,
-          invoiceNumber: generateInvoiceNumber(),
+          invoiceNumber: await this.invoiceNumbers.next(),
         });
       } catch (error) {
         this.logger.error(
@@ -141,13 +142,13 @@ export class InvoiceActor extends BaseActor {
           amount: getInvoiceAmount(billingPlan, subscription.billingFrequency),
           status,
           dueDate: new Date(),
-          description: `Invoice for ${billingPlan.title} subscription from ${billingCycle.startDate.toLocaleDateString()} to ${billingCycle.endDate.toLocaleDateString()}`,
+          description: `${billingPlan.title} plan, monthly`,
           datePaid: null,
           paymentReference: null,
           startDate: billingCycle.startDate,
           endDate: billingCycle.endDate,
           createdBy: subscription.createdBy,
-          invoiceNumber: generateInvoiceNumber(),
+          invoiceNumber: await this.invoiceNumbers.next(),
         });
 
         var invoice = doc.toObject();

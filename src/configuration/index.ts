@@ -18,6 +18,13 @@ export default () => ({
   firebaseProjectId: process.env.FirebaseProjectId,
   firebasePrivateKey: process.env.FirebasePrivateKey?.replace(/\\n/g, '\n'),
   firebaseClientEmail: process.env.FirebaseClientEmail,
+  billing: {
+    /// Days a paid plan keeps working after its end date while the renewal
+    /// is unpaid; then it falls back to Regular.
+    graceDays: Number(process.env.BillingGraceDays) || 3,
+    /// Days before a plan's end date that its renewal invoice goes out.
+    renewalNoticeDays: Number(process.env.BillingRenewalNoticeDays) || 3,
+  },
   paystackConfig: {
     url: process.env.PaystackBaseUrl || 'https://api.paystack.co',
     /// Where Paystack's checkout goes when it's done; the app watches for

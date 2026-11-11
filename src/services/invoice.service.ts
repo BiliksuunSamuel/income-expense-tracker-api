@@ -8,7 +8,7 @@ import { PagedResults } from 'src/common/paged.results.dto';
 import configuration from 'src/configuration';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { InvoiceFilter } from 'src/dtos/invoices/invoice-filter.dto';
-import { PaymentStatus, SubscriptionStatus } from 'src/enums';
+import { InvoiceKind, PaymentStatus, SubscriptionStatus } from 'src/enums';
 import { CommonResponses } from 'src/helper/common.responses.helper';
 import { BillingPlan } from 'src/schemas/billing.plan.schema';
 import { Invoice } from 'src/schemas/invoice.schema';
@@ -18,8 +18,11 @@ import { ChargeCheck, escapeHtml } from 'src/utils/paystack';
 import {
   newSubscriptionInvoice,
   paidPeriod,
+  renewalInvoice,
 } from 'src/utils/subscription-invoice';
 import { literalPattern } from 'src/utils/transaction-query';
+import { BillingNoticeService } from './billing-notice.service';
+import { InvoiceNumberService } from './invoice-number.service';
 import { PaystackService } from './paystack.service';
 
 /// An invoice as the app sees it: with the checkout to open while a payment
@@ -31,6 +34,9 @@ export type InvoiceView = Invoice & {
 
 const OPEN = [PaymentStatus.Pending, PaymentStatus.Processing];
 const PAYABLE = [...OPEN, PaymentStatus.Failed];
+/// A cancelled invoice is never offered again, but a checkout already
+/// started for it still counts if the money arrives.
+const SETTLEABLE = [...PAYABLE, PaymentStatus.Cancelled];
 
 /// How long a started checkout is offered again instead of a new one.
 const REUSE_CHECKOUT_MS = 30 * 60 * 1000;
@@ -51,6 +57,8 @@ export class InvoiceService {
     private readonly paystackService: PaystackService,
     @InjectModel(Subscription.name)
     private readonly subscriptionModel: Model<Subscription>,
+    private readonly invoiceNumbers: InvoiceNumberService,
+    private readonly notices: BillingNoticeService,
   ) {}
 
   static view(invoice: Invoice): InvoiceView {
@@ -80,9 +88,32 @@ export class InvoiceService {
     plan: BillingPlan,
   ): Promise<Invoice> {
     const doc = await this.invoiceModel.create(
-      newSubscriptionInvoice(subscription, plan),
+      newSubscriptionInvoice(subscription, plan, await this.invoiceNumbers.next()),
     );
     return doc.toObject();
+  }
+
+  /// The invoice for [subscription]'s next period; the user is told it's due.
+  async createRenewal(
+    subscription: Subscription,
+    plan: BillingPlan,
+  ): Promise<Invoice> {
+    const doc = await this.invoiceModel.create(
+      renewalInvoice(subscription, plan, await this.invoiceNumbers.next()),
+    );
+    const invoice = doc.toObject();
+    await this.notices.renewalDue(invoice);
+    return invoice;
+  }
+
+  /// Takes the unpaid invoices of [subscriptionIds] off the user's list,
+  /// once a newer choice replaces them or their plan has ended.
+  async cancelUnpaid(subscriptionIds: string[]): Promise<void> {
+    if (!subscriptionIds.length) return;
+    await this.invoiceModel.updateMany(
+      { subscriptionId: { $in: subscriptionIds }, status: { $in: PAYABLE } },
+      { status: PaymentStatus.Cancelled, updatedAt: new Date() },
+    );
   }
 
   /// Starts (or reopens) Paystack's checkout for one of [user]'s invoices.
@@ -112,6 +143,11 @@ export class InvoiceService {
       }
       if (invoice.status === PaymentStatus.Refunded) {
         return CommonResponses.ConflictResponse('This invoice was refunded');
+      }
+      if (invoice.status === PaymentStatus.Cancelled) {
+        return CommonResponses.ConflictResponse(
+          'This invoice was replaced. Choose a plan again to pay.',
+        );
       }
 
       const reference = generateId();
@@ -210,7 +246,7 @@ export class InvoiceService {
     try {
       const open = await this.invoiceModel
         .find({
-          status: PaymentStatus.Processing,
+          status: { $in: [PaymentStatus.Processing, PaymentStatus.Cancelled] },
           paymentReference: { $ne: null },
           paymentStartedAt: { $gte: new Date(Date.now() - RECHECK_FOR_MS) },
         })
@@ -256,7 +292,7 @@ export class InvoiceService {
     invoice: Invoice,
     reference = invoice.paymentReference,
   ): Promise<Invoice> {
-    if (!PAYABLE.includes(invoice.status) || !reference) return invoice;
+    if (!SETTLEABLE.includes(invoice.status) || !reference) return invoice;
     const check = await this.paystackService.checkCharge(
       reference,
       invoice.amount,
@@ -264,7 +300,8 @@ export class InvoiceService {
     if (check.status === PaymentStatus.Processing) return invoice;
     // A failed invoice can still be paid, through an earlier checkout.
     if (
-      invoice.status === PaymentStatus.Failed &&
+      (invoice.status === PaymentStatus.Failed ||
+        invoice.status === PaymentStatus.Cancelled) &&
       check.status !== PaymentStatus.Completed
     ) {
       return invoice;
@@ -306,10 +343,19 @@ export class InvoiceService {
       .findOne({ id: invoice.subscriptionId })
       .lean();
     const paidAt = check.gateway?.paidAt ?? now;
-    const period = paidPeriod(subscription?.billingFrequency, paidAt);
+    // A renewal paid while its plan runs carries the plan on from its end
+    // date, so paying early or in the grace days loses nothing. Any other
+    // payment starts its plan when it's made.
+    const renewing =
+      invoice.kind === InvoiceKind.Renewal &&
+      subscription?.isActive &&
+      subscription.status === SubscriptionStatus.Active;
+    const period = renewing
+      ? { startDate: invoice.startDate, endDate: invoice.endDate }
+      : paidPeriod(subscription?.billingFrequency, paidAt);
     const paid = await this.invoiceModel
       .findOneAndUpdate(
-        { id: invoice.id, status: { $in: PAYABLE } },
+        { id: invoice.id, status: { $in: SETTLEABLE } },
         {
           status: PaymentStatus.Completed,
           datePaid: paidAt,
@@ -325,7 +371,12 @@ export class InvoiceService {
       .lean();
     if (!paid) return this.invoiceModel.findOne({ id: invoice.id }).lean();
 
-    if (subscription) {
+    if (renewing) {
+      await this.subscriptionModel.updateOne(
+        { id: subscription.id },
+        { endDate: period.endDate, updatedAt: now },
+      );
+    } else if (subscription) {
       await this.subscriptionModel.updateOne(
         { id: subscription.id },
         {
@@ -336,12 +387,18 @@ export class InvoiceService {
           updatedAt: now,
         },
       );
+      const others = await this.subscriptionModel
+        .find({ userId: paid.userId, id: { $ne: subscription.id }, isActive: true })
+        .lean();
       await this.subscriptionModel.updateMany(
         { userId: paid.userId, id: { $ne: subscription.id }, isActive: true },
         { isActive: false, status: SubscriptionStatus.Closed, updatedAt: now },
       );
+      // The plan being left needs no renewal now.
+      await this.cancelUnpaid(others.map((o) => o.id));
     }
     this.logger.log('Invoice paid', { invoiceId: paid.id, userId: paid.userId });
+    await this.notices.paid(paid);
     return paid;
   }
 

@@ -148,33 +148,32 @@ export function calculateYearlyPrice(plan: BillingPlan): BillingPlan {
   return plan;
 }
 
-export function getInvoiceStartDateAndEndDate(subscription: Subscription): {
+/// [date] moved on [months] calendar months, kept on the same day of the
+/// month where it exists, else the month's last day (31 Jan → 28 Feb).
+export function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  const last = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  d.setUTCDate(Math.min(day, last));
+  return d;
+}
+
+/// The period that starts at [subscription]'s start date: a calendar month
+/// or a year.
+export function getInvoiceStartDateAndEndDate(
+  subscription: Pick<Subscription, 'startDate' | 'billingFrequency'>,
+): {
   startDate: Date;
   endDate: Date;
 } {
-  if (subscription.billingFrequency === BillingFrequency.Monthly) {
-    const startDate = new Date(subscription.startDate);
-    //add 30 days to start date for monthly billing
-    const endDate = new Date(
-      startDate.getFullYear(),
-      startDate.getMonth(),
-      startDate.getDate() + 30,
-      23,
-      59,
-      59,
-    );
-    return { startDate, endDate };
-  }
   const startDate = new Date(subscription.startDate);
-  const endDate = new Date(
-    startDate.getFullYear() + 1,
-    startDate.getMonth(),
-    startDate.getDate() - 1,
-    23,
-    59,
-    59,
-  );
-  return { startDate, endDate };
+  const months =
+    subscription.billingFrequency === BillingFrequency.Yearly ? 12 : 1;
+  return { startDate, endDate: addMonths(startDate, months) };
 }
 
 export function getInvoiceAmount(

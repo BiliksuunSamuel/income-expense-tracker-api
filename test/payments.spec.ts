@@ -1,7 +1,11 @@
 import { createHmac } from 'crypto';
-import { PaymentStatus, SubscriptionStatus, BillingFrequency } from 'src/enums';
+import { InvoiceKind, PaymentStatus, SubscriptionStatus, BillingFrequency } from 'src/enums';
 import { InvoiceService } from 'src/services/invoice.service';
 import { SubscriptionService } from 'src/services/subscription.service';
+import { BillingCycleService } from 'src/services/billing-cycle.service';
+import { InvoiceNumberService } from 'src/services/invoice-number.service';
+import { SubscriptionMiddleware } from 'src/middleware/subscription.middleware';
+import { addMonths } from 'src/utils';
 import {
   escapeHtml,
   isValidPaystackSignature,
@@ -14,48 +18,71 @@ process.env.ApiBaseUrl = 'https://api.example.com';
 
 const user = { id: 'u1', email: 'ama@example.com', phoneNumber: '', tokenId: 't' };
 
-/// A tiny in-memory stand-in for a Mongoose model: enough of find, update
-/// and $in / $ne / $or for these services.
+/// A tiny in-memory stand-in for a Mongoose model: enough of find, update,
+/// upsert and $in / $ne / $or / ranges for these services.
 function model(rows: any[]) {
-  const matches = (row: any, q: any): boolean =>
-    Object.entries(q).every(([k, v]: [string, any]) => {
-      if (k === '$or') return v.some((part: any) => matches(row, part));
-      const value = row[k];
-      if (v && typeof v === 'object' && !(v instanceof Date)) {
-        if ('$in' in v) return v.$in.includes(value);
-        if ('$ne' in v) return value !== v.$ne;
-        if ('$gte' in v) return value >= v.$gte;
-      }
-      if (Array.isArray(value)) return value.includes(v);
-      return value === v;
-    });
-  const apply = (row: any, update: any) => {
-    const { $set, $push, ...plain } = update;
-    Object.assign(row, plain, $set ?? {});
-    for (const [k, v] of Object.entries($push ?? {})) {
-      row[k] = [...(row[k] ?? []), v];
+  const num = (x: any) => (x instanceof Date ? x.getTime() : x);
+  const test = (value: any, v: any): boolean => {
+    if (v && typeof v === 'object' && !(v instanceof Date) && !Array.isArray(v)) {
+      return Object.entries(v).every(([op, arg]: [string, any]) => {
+        switch (op) {
+          case '$in': return arg.some((a: any) => num(a) === num(value));
+          case '$ne': return num(value) !== num(arg);
+          case '$gte': return value != null && num(value) >= num(arg);
+          case '$gt': return value != null && num(value) > num(arg);
+          case '$lte': return value != null && num(value) <= num(arg);
+          case '$lt': return value != null && num(value) < num(arg);
+          default: throw new Error(`unsupported ${op}`);
+        }
+      });
     }
+    if (Array.isArray(value)) return value.includes(v);
+    return num(value) === num(v);
+  };
+  const matches = (row: any, q: any): boolean =>
+    Object.entries(q).every(([k, v]: [string, any]) =>
+      k === '$or' ? v.some((part: any) => matches(row, part)) : test(row[k], v),
+    );
+  const apply = (row: any, update: any) => {
+    const { $set, $push, $inc, $setOnInsert, ...plain } = update;
+    Object.assign(row, plain, $set ?? {});
+    for (const [k, v] of Object.entries($push ?? {})) row[k] = [...(row[k] ?? []), v];
+    for (const [k, v] of Object.entries($inc ?? {})) row[k] = (row[k] ?? 0) + (v as number);
   };
   const lean = <T>(value: T) => ({ lean: async () => value, then: (r: any) => r(value) });
   return {
     rows,
-    findOne: (q: any) => lean(rows.find((r) => matches(r, q)) ?? null),
+    findOne: (q: any) => {
+      const chain: any = {
+        sort: () => chain,
+        lean: async () => rows.find((r) => matches(r, q)) ?? null,
+        then: (r: any) => r(rows.find((x) => matches(x, q)) ?? null),
+      };
+      return chain;
+    },
     find: (q: any) => {
       const found = rows.filter((r) => matches(r, q));
       const chain: any = { skip: () => chain, limit: () => chain, sort: () => chain, lean: async () => found };
       return chain;
     },
-    findOneAndUpdate: (q: any, update: any) => {
-      const row = rows.find((r) => matches(r, q));
+    findOneAndUpdate: (q: any, update: any, opts: any = {}) => {
+      let row = rows.find((r) => matches(r, q));
+      if (!row && opts.upsert) {
+        row = { ...Object.fromEntries(Object.entries(q).filter(([k]) => !k.startsWith('$'))), ...(update.$setOnInsert ?? {}) };
+        rows.push(row);
+      }
       if (row) apply(row, update);
       return lean(row ? { ...row } : null);
     },
     updateOne: async (q: any, update: any) => {
       const row = rows.find((r) => matches(r, q));
       if (row) apply(row, update);
+      return { modifiedCount: row ? 1 : 0 };
     },
     updateMany: async (q: any, update: any) => {
-      rows.filter((r) => matches(r, q)).forEach((r) => apply(r, update));
+      const hit = rows.filter((r) => matches(r, q));
+      hit.forEach((r) => apply(r, update));
+      return { modifiedCount: hit.length };
     },
     create: async (doc: any) => {
       rows.push({ ...doc });
@@ -71,9 +98,10 @@ function setup() {
     { id: 'premium', title: 'Premium', price: 20, yearlyDiscount: 10, maxNumberOfTransactions: 5000 },
   ]);
   const subscriptions = model([
-    { id: 's-old', userId: 'u1', isActive: true, status: SubscriptionStatus.Active, billingPlanId: 'free', planTitle: 'Regular', billingFrequency: BillingFrequency.Monthly },
+    { id: 's-old', userId: 'u1', isActive: true, status: SubscriptionStatus.Active, billingPlanId: 'free', planTitle: 'Regular', billingFrequency: BillingFrequency.Monthly, maxNumberOfTransactions: 50, endDate: new Date('2027-11-01') },
   ]);
   const invoices = model([]);
+  const transactions = model([]);
   // Paystack: what verify answers, per reference.
   const paystack = {
     answers: new Map<string, any>(),
@@ -88,12 +116,24 @@ function setup() {
       ),
     ),
   };
-  const invoiceService = new InvoiceService(invoices as any, paystack as any, subscriptions as any);
+  const numbers = new InvoiceNumberService(model([]) as any);
+  const notices = { paid: jest.fn(), renewalDue: jest.fn(), expired: jest.fn() };
+  const invoiceService = new InvoiceService(invoices as any, paystack as any, subscriptions as any, numbers, notices as any);
+  const billing = new BillingCycleService(
+    subscriptions as any,
+    plans as any,
+    invoices as any,
+    transactions as any,
+    invoiceService,
+    notices as any,
+  );
   const subscriptionService = new SubscriptionService(
     subscriptions as any,
     plans as any,
     invoiceService,
     {} as any,
+    billing,
+    invoices as any,
   );
   const paid = (reference: string, amount = 2000) =>
     paystack.answers.set(reference, {
@@ -106,7 +146,7 @@ function setup() {
       paid_at: '2026-11-11T10:00:00.000Z',
       authorization: { bank: 'MTN', mobile_money_number: '0241234567' },
     });
-  return { plans, subscriptions, invoices, paystack, invoiceService, subscriptionService, paid };
+  return { plans, subscriptions, invoices, transactions, paystack, invoiceService, subscriptionService, billing, notices, paid };
 }
 
 describe('Paystack helpers', () => {
@@ -266,5 +306,125 @@ describe('Paying an invoice', () => {
     paid(invoice.paymentReference, 21600);
     await invoiceService.recheckOpenPayments();
     expect(invoices.rows[0].status).toBe(PaymentStatus.Completed);
+  });
+});
+
+describe('The billing cycle', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  /// u1 on Premium monthly, paid, ending [endsInDays] from [now].
+  async function onPremium(now: Date, endsInDays: number) {
+    const s = setup();
+    const res = await s.subscriptionService.buySubscription(
+      { billingPlanId: 'premium', billingFrequency: BillingFrequency.Monthly },
+      user,
+    );
+    s.paid(res.data.invoice.paymentReference);
+    await s.invoiceService.confirmInvoice(res.data.invoice.id, user);
+    const sub = s.subscriptions.rows.find((r) => r.id === res.data.id);
+    sub.endDate = new Date(now.getTime() + endsInDays * DAY);
+    return { ...s, sub };
+  }
+
+  it('counts periods in calendar months', () => {
+    expect(addMonths(new Date('2026-01-31T09:00:00Z'), 1).toISOString()).toBe('2026-02-28T09:00:00.000Z');
+    expect(addMonths(new Date('2026-11-11T09:00:00Z'), 12).toISOString()).toBe('2027-11-11T09:00:00.000Z');
+  });
+
+  it('numbers invoices in order', async () => {
+    const { invoices } = await onPremium(new Date(), 30);
+    expect(invoices.rows[0].invoiceNumber).toMatch(/^INV-\d{4}-000001$/);
+  });
+
+  it('sends one renewal invoice a few days before the end', async () => {
+    const now = new Date();
+    const { billing, invoices, notices, sub } = await onPremium(now, 2);
+    await billing.runBillingCycle(now);
+    await billing.runBillingCycle(now);
+    const renewals = invoices.rows.filter((i) => i.kind === InvoiceKind.Renewal);
+    expect(renewals).toHaveLength(1);
+    expect(renewals[0]).toMatchObject({ status: PaymentStatus.Pending, amount: 20, dueDate: sub.endDate });
+    expect(renewals[0].invoiceNumber).toMatch(/000002$/);
+    expect(notices.renewalDue).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries the plan on from its end date when the renewal is paid', async () => {
+    const now = new Date();
+    const { billing, invoices, invoiceService, paid, sub } = await onPremium(now, 2);
+    const endsAt = sub.endDate;
+    await billing.runBillingCycle(now);
+    const renewal = invoices.rows.find((i) => i.kind === InvoiceKind.Renewal);
+    const pay = await invoiceService.payInvoiceAsync(renewal.id, user);
+    paid(pay.data.paymentReference);
+    await invoiceService.confirmInvoice(renewal.id, user);
+    expect(sub).toMatchObject({ isActive: true, status: SubscriptionStatus.Active });
+    expect(sub.endDate.toISOString()).toBe(addMonths(endsAt, 1).toISOString());
+  });
+
+  it('keeps the plan through the grace days, then falls back to Regular', async () => {
+    const now = new Date();
+    const { billing, invoices, notices, subscriptions, sub } = await onPremium(now, -2);
+    await billing.runBillingCycle(now);
+    expect(sub.isActive).toBe(true);
+
+    await billing.runBillingCycle(new Date(now.getTime() + 2 * DAY));
+    expect(sub).toMatchObject({ isActive: false, status: SubscriptionStatus.Expired });
+    expect(invoices.rows.find((i) => i.kind === InvoiceKind.Renewal).status).toBe(PaymentStatus.Cancelled);
+    expect(subscriptions.rows.find((r) => r.id === 's-old')).toMatchObject({ isActive: true, status: SubscriptionStatus.Active });
+    expect(notices.expired).toHaveBeenCalledTimes(1);
+  });
+
+  it('expires a lapsed plan as soon as the user is seen', async () => {
+    const now = new Date();
+    const { billing, sub } = await onPremium(now, -4);
+    const access = await billing.access('u1', now);
+    expect(sub.status).toBe(SubscriptionStatus.Expired);
+    expect(access.subscription).toMatchObject({ id: 's-old', planTitle: 'Regular' });
+  });
+
+  it('withdraws the invoice of a choice replaced by a newer one', async () => {
+    const { subscriptionService, invoiceService, invoices, paid } = setup();
+    const first = await subscriptionService.buySubscription(
+      { billingPlanId: 'premium', billingFrequency: BillingFrequency.Monthly },
+      user,
+    );
+    await subscriptionService.buySubscription(
+      { billingPlanId: 'premium', billingFrequency: BillingFrequency.Yearly },
+      user,
+    );
+    const old = invoices.rows.find((i) => i.id === first.data.invoice.id);
+    expect(old.status).toBe(PaymentStatus.Cancelled);
+    expect((await invoiceService.payInvoiceAsync(old.id, user)).code).toBe(409);
+
+    // Money that still arrives for its open checkout isn't lost.
+    paid(old.paymentReference);
+    await invoiceService.recheckOpenPayments();
+    expect(old.status).toBe(PaymentStatus.Completed);
+  });
+
+  it('limits new entries per calendar month, and only new entries', async () => {
+    const s = setup();
+    const lastMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1) - DAY);
+    for (let i = 0; i < 50; i++) {
+      s.transactions.rows.push({ userId: 'u1', recordedAt: i < 10 ? lastMonth : new Date() });
+    }
+    const middleware = new SubscriptionMiddleware(
+      { getAuthDetails: async () => ({ user }) } as any,
+      s.billing,
+    );
+    const run = async (method: string, url: string) => {
+      const res: any = { status: jest.fn(() => res), send: jest.fn(() => res) };
+      const next = jest.fn();
+      await middleware.use({ method, originalUrl: url, query: {} } as any, res, next);
+      return { next, res };
+    };
+
+    expect((await run('POST', '/api/transactions')).next).toHaveBeenCalled();
+    for (let i = 0; i < 10; i++) s.transactions.rows.push({ userId: 'u1', recordedAt: new Date() });
+    const blocked = await run('POST', '/api/transactions');
+    expect(blocked.next).not.toHaveBeenCalled();
+    expect(blocked.res.status).toHaveBeenCalledWith(403);
+    expect((await run('GET', '/api/transactions?page=1')).next).toHaveBeenCalled();
+    expect((await run('PATCH', '/api/transactions/t1')).next).toHaveBeenCalled();
   });
 });

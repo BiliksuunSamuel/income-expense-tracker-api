@@ -27,4 +27,16 @@ export class SubscriptionResponse extends BaseSchema {
 
   @ApiProperty()
   billingFrequency: BillingFrequency;
+
+  /// Entries recorded this calendar month, which the plan's limit counts.
+  @ApiProperty({ required: false })
+  entriesThisMonth?: number;
+
+  /// The renewal invoice waiting to be paid, if there is one.
+  @ApiProperty({ required: false, nullable: true })
+  renewalInvoiceId?: string | null;
+
+  /// When a paid plan stops if its renewal stays unpaid; null when free.
+  @ApiProperty({ required: false, nullable: true })
+  graceEndsAt?: Date | null;
 }

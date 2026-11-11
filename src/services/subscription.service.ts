@@ -7,12 +7,25 @@ import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { SubscriptionRequestDto } from 'src/dtos/billing-plan/subscription-request.dto';
 import { SubscriptionResponse } from 'src/dtos/billing-plan/subscription-response.dto';
 import { SubscriptionsFilter } from 'src/dtos/billing-plan/subscriptions-filter.dto';
-import { BillingPlanType, SubscriptionStatus } from 'src/enums';
+import {
+  BillingPlanType,
+  InvoiceKind,
+  PaymentStatus,
+  SubscriptionStatus,
+} from 'src/enums';
 import { CommonResponses } from 'src/helper/common.responses.helper';
 import { UserRepository } from 'src/repositories/user.repository';
 import { BillingPlan } from 'src/schemas/billing.plan.schema';
 import { Subscription } from 'src/schemas/subscription.schema';
-import { calculateYearlyPrice, generateId } from 'src/utils';
+import {
+  addMonths,
+  calculateYearlyPrice,
+  generateId,
+  getInvoiceStartDateAndEndDate,
+} from 'src/utils';
+import { graceEndsAt } from 'src/utils/subscription-invoice';
+import { Invoice } from 'src/schemas/invoice.schema';
+import { BillingCycleService } from './billing-cycle.service';
 import { literalPattern } from 'src/utils/transaction-query';
 import { InvoiceService, InvoiceView } from './invoice.service';
 
@@ -52,6 +65,8 @@ export class SubscriptionService {
     private readonly billingPlanModel: Model<BillingPlan>,
     private readonly invoiceService: InvoiceService,
     private readonly userRepository: UserRepository,
+    private readonly billing: BillingCycleService,
+    @InjectModel(Invoice.name) private readonly invoiceModel: Model<Invoice>,
   ) {}
 
   /// Chooses [request]'s plan. A free plan starts now; a paid one waits,
@@ -94,21 +109,30 @@ export class SubscriptionService {
 
       const free = billingPlan.price <= 0;
       const now = new Date();
-      // Earlier choices left unpaid give way to this one.
-      await this.subscriptionModel.updateMany(
-        {
+      // Earlier choices left unpaid give way to this one, invoices too.
+      const stale = await this.subscriptionModel
+        .find({
           userId: authUser.id,
           isActive: false,
           status: SubscriptionStatus.Pending,
-        },
+        })
+        .lean();
+      await this.subscriptionModel.updateMany(
+        { id: { $in: stale.map((s) => s.id) } },
         { status: SubscriptionStatus.Closed, updatedAt: now },
       );
+      await this.invoiceService.cancelUnpaid(stale.map((s) => s.id));
       const doc = await this.subscriptionModel.create({
         billingFrequency: request.billingFrequency,
         userId: authUser.id,
         isActive: free,
         startDate: now,
-        endDate: new Date(new Date(now).setFullYear(now.getFullYear() + 1)),
+        endDate: free
+          ? addMonths(now, 12)
+          : getInvoiceStartDateAndEndDate({
+              startDate: now,
+              billingFrequency: request.billingFrequency,
+            }).endDate,
         planTitle: billingPlan.title,
         id: generateId(),
         createdAt: now,
@@ -163,9 +187,9 @@ export class SubscriptionService {
     userId: string,
   ): Promise<ApiResponseDto<SubscriptionResponse>> {
     try {
-      const activeSubscription = await this.subscriptionModel
-        .findOne({ userId, isActive: true })
-        .lean();
+      // Brings a lapsed plan up to date before it's shown.
+      const access = await this.billing.access(userId);
+      const activeSubscription = access?.subscription;
       if (!activeSubscription) {
         this.logger.warn('No active subscription found for user', { userId });
         return CommonResponses.NotFoundResponse('No active subscription found');
@@ -184,7 +208,28 @@ export class SubscriptionService {
           'You do not have an active subscription',
         );
       }
-      const response = toResponse(activeSubscription, billingPlan);
+      const paid = billingPlan.price > 0;
+      const renewal = paid
+        ? await this.invoiceModel
+            .findOne({
+              subscriptionId: activeSubscription.id,
+              kind: InvoiceKind.Renewal,
+              status: {
+                $in: [
+                  PaymentStatus.Pending,
+                  PaymentStatus.Processing,
+                  PaymentStatus.Failed,
+                ],
+              },
+            })
+            .lean()
+        : null;
+      const response: SubscriptionResponse = {
+        ...toResponse(activeSubscription, billingPlan),
+        entriesThisMonth: await access.entriesThisMonth(),
+        renewalInvoiceId: renewal?.id ?? null,
+        graceEndsAt: paid ? graceEndsAt(activeSubscription.endDate) : null,
+      };
       this.logger.log('User active subscription fetched successfully', {
         userId,
         response,

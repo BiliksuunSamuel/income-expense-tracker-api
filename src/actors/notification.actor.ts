@@ -7,6 +7,14 @@ import { FirebaseService } from 'src/services/firebase.service';
 import { SendSmsRequest } from 'src/common';
 import { MailService } from 'src/services/mail.service';
 import { EmailRequest } from 'src/dtos/notification/email.request.dto';
+import { SmsNotificationDto } from 'src/dtos/notification/sms-notification.dto';
+import configuration from 'src/configuration';
+
+interface SmsProviderResponse {
+  success?: boolean;
+  status?: number;
+  message?: string;
+}
 
 @Injectable()
 export class NotificationsActor extends BaseActor {
@@ -55,6 +63,34 @@ export class NotificationsActor extends BaseActor {
           ctx.name,
           error,
         );
+      }
+    },
+  );
+
+  /// Sends an SMS through LetsFish, as Pulse does. Used for admin sign-in
+  /// codes; app users' codes still go by email (smsNotificationActor).
+  sendSmsNotification = spawnStateless(
+    this.system,
+    async (msg: SmsNotificationDto) => {
+      try {
+        const { smsApi, token, senderId } = configuration().sms;
+        const res = await this.proxyHttpService.request<SmsProviderResponse>({
+          method: 'post',
+          url: `${smsApi}/v1/sms`,
+          token,
+          data: {
+            message: msg.message,
+            recipients: msg.recipients,
+            sender_id: senderId,
+          },
+        });
+        if (res?.success === false) {
+          this.logger.error('SMS provider rejected the message', res);
+          return;
+        }
+        this.logger.log('SMS sent');
+      } catch (error) {
+        this.logger.error('Error sending SMS', error?.message ?? error);
       }
     },
   );

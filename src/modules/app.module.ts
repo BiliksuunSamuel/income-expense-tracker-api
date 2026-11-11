@@ -59,6 +59,9 @@ export class AppModule {
     consumer
       .apply(SubscriptionMiddleware)
       .exclude(
+        // the console: its own sign-in and guards
+        { path: 'api/admin/(.*)', method: RequestMethod.ALL },
+
         // auth endpoints
         { path: 'api/authentication/login', method: RequestMethod.POST },
         { path: 'api/authentication/otp-verify', method: RequestMethod.PATCH },
@@ -100,6 +103,7 @@ export class AppModule {
     consumer
       .apply(AuthMiddleware)
       .exclude(
+        { path: 'api/admin/(.*)', method: RequestMethod.ALL },
         { path: 'api/authentication/login', method: RequestMethod.POST },
         { path: 'api/authentication/otp-verify', method: RequestMethod.PATCH },
         { path: 'api/authentication/otp-resend', method: RequestMethod.POST },

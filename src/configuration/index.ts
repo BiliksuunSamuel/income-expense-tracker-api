@@ -18,6 +18,20 @@ export default () => ({
   firebaseProjectId: process.env.FirebaseProjectId,
   firebasePrivateKey: process.env.FirebasePrivateKey?.replace(/\\n/g, '\n'),
   firebaseClientEmail: process.env.FirebaseClientEmail,
+  /// LetsFish, as Pulse: texts admin sign-in codes.
+  sms: {
+    appId: process.env.LetsFishAppId,
+    appSecret: process.env.LetsFishAppSecret,
+    senderId: process.env.LetsFishSenderId,
+    smsApi: process.env.LetsFishSmsApi,
+    token: process.env.LetsFishToken,
+  },
+  admin: {
+    /// Becomes the first Owner when there are no admins yet (233… or 0…).
+    firstAdminPhone: process.env.FirstAdminPhone,
+    /// How long a console session lasts.
+    sessionHours: Number(process.env.AdminSessionHours) || 12,
+  },
   billing: {
     /// Days a paid plan keeps working after its end date while the renewal
     /// is unpaid; then it falls back to Regular.

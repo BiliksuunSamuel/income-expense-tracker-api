@@ -239,6 +239,14 @@ export class InvoiceService {
     return this.check(invoice, reference);
   }
 
+  /// An admin's "ask Paystack again" for one invoice: settles it if the
+  /// payment has gone through (or failed) since.
+  async recheck(id: string): Promise<Invoice | null> {
+    const invoice = await this.invoiceModel.findOne({ id }).lean();
+    if (!invoice) return null;
+    return this.check(invoice);
+  }
+
   /// Payments left unfinished (the app closed, a webhook missed): asked
   /// again while they may still go through.
   @Cron(CronExpression.EVERY_10_MINUTES)

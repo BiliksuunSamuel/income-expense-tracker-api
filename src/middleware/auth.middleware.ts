@@ -4,6 +4,7 @@ import { NextFunction, Request, Response } from 'express';
 import { UserJwtDetails } from 'src/dtos/auth/user.jwt.details';
 import { UserRepository } from 'src/repositories/user.repository';
 import { toPaginationInfo } from 'src/utils';
+import { UserStatus } from 'src/enums';
 
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
@@ -32,6 +33,11 @@ export class AuthMiddleware implements NestMiddleware {
         }
         if (user.tokenId !== decondedToken.tokenId) {
           return res.status(401).send({ message: 'Unauthorized' });
+        }
+        if (user.status === UserStatus.Inactive) {
+          return res
+            .status(403)
+            .send({ message: 'This account is suspended. Contact support.' });
         }
       } catch (error) {
         this.logger.error('Error in AuthMiddleware', error);

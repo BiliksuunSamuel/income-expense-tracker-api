@@ -91,4 +91,14 @@ export class Invoice extends BaseSchema {
   @Prop({ type: String, default: null })
   @ApiProperty()
   billingPlanId: string;
+
+  /// Set when an admin marks a paid invoice refunded (the money itself is
+  /// returned in Paystack).
+  @Prop({ type: Date, default: null })
+  @ApiProperty()
+  refundedAt: Date | null;
+
+  @Prop({ type: String, default: null })
+  @ApiProperty()
+  refundNote: string | null;
 }

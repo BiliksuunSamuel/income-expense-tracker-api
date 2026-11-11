@@ -63,6 +63,17 @@ export enum PaymentStatus {
   Cancelled = 'Cancelled',
 }
 
+/// What an admin may do in the console.
+export enum AdminRole {
+  Owner = 'Owner',
+  Admin = 'Admin',
+}
+
+export enum AdminStatus {
+  Active = 'Active',
+  Suspended = 'Suspended',
+}
+
 /// Why an invoice was issued: choosing a plan, or the next period of one.
 export enum InvoiceKind {
   New = 'New',
